@@ -331,12 +331,6 @@ body {
   color: var(--ink-soft);
 }
 
-.writer-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.3fr;
-  gap: 18px;
-}
-
 .writer-panel {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -360,11 +354,15 @@ body {
 .writer-fields {
   display: grid;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .writer-fields-two {
   grid-template-columns: 1fr 1fr;
-  margin-bottom: 12px;
+}
+
+.writer-fields-three {
+  grid-template-columns: 1.5fr 1fr 1fr;
 }
 
 .writer-fields label {
@@ -388,7 +386,7 @@ body {
 
 .writer-fields textarea {
   resize: vertical;
-  min-height: 220px;
+  min-height: 360px;
 }
 
 .writer-inline {
@@ -408,8 +406,36 @@ body {
   gap: 6px;
 }
 
+.writer-check-box {
+  border: 1px dashed #e7d8c8;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff8f0;
+  align-self: end;
+}
+
+.writer-main-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.writer-main-head h2 {
+  margin: 0;
+}
+
+.writer-main-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .btn-light,
-.btn-strong {
+.btn-strong,
+.btn-danger {
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 9px 16px;
@@ -427,6 +453,12 @@ body {
 .btn-strong {
   background: var(--accent);
   color: #fff9f4;
+}
+
+.btn-danger {
+  background: #fce3df;
+  border-color: #f5c6be;
+  color: #8a3729;
 }
 
 .btn-strong:disabled {
@@ -458,6 +490,20 @@ body {
 .status-success {
   background: #e8f7ee;
   color: #2b6b45;
+}
+
+.writer-manage-panel .writer-inline {
+  margin-top: 0;
+}
+
+.writer-connection-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #5a4535;
+}
+
+.writer-help-top {
+  margin-top: 12px;
 }
 
 .writer-preview-panel h2 {
@@ -570,10 +616,11 @@ body {
     margin-bottom: 56px;
   }
 
-  .writer-grid {
-    grid-template-columns: 1fr;
+  .writer-main-actions {
+    width: 100%;
   }
 
+  .writer-fields-three,
   .writer-fields-two {
     grid-template-columns: 1fr;
   }
@@ -583,7 +630,8 @@ body {
   }
 
   .btn-light,
-  .btn-strong {
+  .btn-strong,
+  .btn-danger {
     width: 100%;
     text-align: center;
   }

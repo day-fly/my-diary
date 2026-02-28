@@ -1,9 +1,16 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "myDiaryWriterConfigV2";
+  var STORAGE_KEY = "myDiaryWriterConfigV3";
   var OAUTH_PENDING_KEY = "myDiaryWriterOAuthPendingV1";
   var API_BASE = "https://api.github.com";
+
+  var siteTitleLink = document.querySelector(".site-title");
+  var siteBase = "";
+  if (siteTitleLink) {
+    var href = siteTitleLink.getAttribute("href") || "/";
+    siteBase = href === "/" ? "" : href.replace(/\/$/, "");
+  }
 
   var ownerInput = document.getElementById("gh-owner");
   var repoInput = document.getElementById("gh-repo");
@@ -22,11 +29,19 @@
   var subtitleInput = document.getElementById("post-subtitle");
   var dateInput = document.getElementById("post-date");
   var coverInput = document.getElementById("cover-image");
+  var coverUrlInput = document.getElementById("cover-url");
   var galleryInput = document.getElementById("gallery-images");
   var bodyInput = document.getElementById("post-body");
   var appendGalleryInput = document.getElementById("append-gallery");
   var publishButton = document.getElementById("publish-post");
+  var deleteButton = document.getElementById("delete-post");
+  var newDraftButton = document.getElementById("new-draft");
   var statusElement = document.getElementById("writer-status");
+
+  var postListSelect = document.getElementById("post-list");
+  var loadPostsButton = document.getElementById("load-posts");
+  var loadSelectedPostButton = document.getElementById("load-selected-post");
+  var currentPostPathInput = document.getElementById("current-post-path");
 
   var previewDate = document.getElementById("preview-date");
   var previewTitle = document.getElementById("preview-title");
@@ -35,7 +50,7 @@
   var previewBody = document.getElementById("preview-body");
   var previewGallery = document.getElementById("preview-gallery");
 
-  if (!ownerInput || !repoInput || !titleInput || !publishButton) {
+  if (!ownerInput || !repoInput || !titleInput || !publishButton || !postListSelect) {
     return;
   }
 
@@ -112,8 +127,26 @@
     ].join("");
   }
 
+  function datetimeLocalFromString(value) {
+    if (!value) return "";
+    var date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return formatDatetimeLocal(date);
+  }
+
   function escapeYaml(value) {
     return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, " ").trim();
+  }
+
+  function unquoteYaml(value) {
+    var text = (value || "").trim();
+    if (
+      (text.startsWith('"') && text.endsWith('"')) ||
+      (text.startsWith("'") && text.endsWith("'"))
+    ) {
+      text = text.slice(1, -1);
+    }
+    return text.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
   }
 
   function slugify(value) {
@@ -123,9 +156,7 @@
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
-    if (!cleaned) {
-      return "entry-" + Date.now().toString().slice(-6);
-    }
+    if (!cleaned) return "entry-" + Date.now().toString().slice(-6);
     return cleaned;
   }
 
@@ -141,9 +172,7 @@
 
   function fileExtension(file) {
     var name = file.name || "";
-    if (name.lastIndexOf(".") >= 0) {
-      return name.split(".").pop().toLowerCase();
-    }
+    if (name.lastIndexOf(".") >= 0) return name.split(".").pop().toLowerCase();
     if (file.type === "image/png") return "png";
     if (file.type === "image/webp") return "webp";
     if (file.type === "image/gif") return "gif";
@@ -212,6 +241,17 @@
     return arrayBufferToBase64(encoded.buffer);
   }
 
+  function base64ToUtf8(base64Text) {
+    var normalized = (base64Text || "").replace(/\n/g, "");
+    var binary = atob(normalized);
+    var bytes = new Uint8Array(binary.length);
+    var i = 0;
+    for (i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder().decode(bytes);
+  }
+
   function randomString(size) {
     var bytes = new Uint8Array(size);
     window.crypto.getRandomValues(bytes);
@@ -222,6 +262,30 @@
     var data = new TextEncoder().encode(verifier);
     var digest = await window.crypto.subtle.digest("SHA-256", data);
     return arrayBufferToBase64Url(digest);
+  }
+
+  function toPreviewAssetUrl(value) {
+    var text = (value || "").trim();
+    if (!text) return "";
+    if (text.startsWith("http://") || text.startsWith("https://")) return text;
+    if (text.startsWith("/")) return siteBase + text;
+    return text;
+  }
+
+  function parseMarkdown(markdown) {
+    var match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
+    if (!match) return { data: {}, body: markdown };
+
+    var frontMatter = match[1];
+    var body = match[2] || "";
+    var data = {};
+    frontMatter.split(/\r?\n/).forEach(function (line) {
+      var parsed = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+      if (!parsed) return;
+      data[parsed[1]] = unquoteYaml(parsed[2]);
+    });
+
+    return { data: data, body: body };
   }
 
   function setStatus(message, type, allowHtml) {
@@ -296,7 +360,6 @@
     previewTitle.textContent = titleInput.value.trim() || "제목을 입력하세요";
     previewSubtitle.textContent = subtitleInput.value.trim();
     previewSubtitle.style.display = subtitleInput.value.trim() ? "block" : "none";
-
     previewBody.textContent = bodyInput.value.trim() || "내용 미리보기가 여기에 표시됩니다.";
 
     clearPreviewUrls();
@@ -305,10 +368,15 @@
 
     if (coverInput.files && coverInput.files[0]) {
       coverObjectUrl = URL.createObjectURL(coverInput.files[0]);
-      var coverImg = document.createElement("img");
-      coverImg.src = coverObjectUrl;
-      coverImg.alt = "표지 미리보기";
-      previewCover.appendChild(coverImg);
+      var uploadedCover = document.createElement("img");
+      uploadedCover.src = coverObjectUrl;
+      uploadedCover.alt = "표지 미리보기";
+      previewCover.appendChild(uploadedCover);
+    } else if (coverUrlInput.value.trim()) {
+      var existingCover = document.createElement("img");
+      existingCover.src = toPreviewAssetUrl(coverUrlInput.value.trim());
+      existingCover.alt = "표지 미리보기";
+      previewCover.appendChild(existingCover);
     }
 
     if (galleryInput.files && galleryInput.files.length > 0) {
@@ -330,15 +398,10 @@
 
   async function githubFetch(url, token, options) {
     var finalOptions = options || {};
-    var headers = {
-      Accept: "application/vnd.github+json",
-    };
-    if (token) {
-      headers.Authorization = "Bearer " + token;
-    }
-    if (finalOptions.headers) {
-      Object.assign(headers, finalOptions.headers);
-    }
+    var headers = { Accept: "application/vnd.github+json" };
+    if (token) headers.Authorization = "Bearer " + token;
+    if (finalOptions.headers) Object.assign(headers, finalOptions.headers);
+
     var body = finalOptions.body;
     if (body && typeof body !== "string") {
       body = JSON.stringify(body);
@@ -369,19 +432,13 @@
   async function proxyExchangeToken(proxyUrl, payload) {
     var response = await fetch(proxyUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     var contentType = response.headers.get("content-type") || "";
     var data = contentType.indexOf("application/json") >= 0 ? await response.json() : {};
-    if (!response.ok) {
-      throw new Error(data.message || data.error || "OAuth token 교환 실패");
-    }
-    if (!data.access_token) {
-      throw new Error("OAuth access token이 응답에 없습니다.");
-    }
+    if (!response.ok) throw new Error(data.message || data.error || "OAuth token 교환 실패");
+    if (!data.access_token) throw new Error("OAuth access token이 응답에 없습니다.");
     return data;
   }
 
@@ -404,50 +461,94 @@
       },
     });
 
-    if (response.status === 404) {
-      return null;
-    }
+    if (response.status === 404) return null;
 
     var payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.message || "파일 확인 실패");
-    }
+    if (!response.ok) throw new Error(payload.message || "파일 확인 실패");
     return payload;
   }
 
   async function putContent(params) {
-    var owner = params.owner;
-    var repo = params.repo;
-    var branch = params.branch;
-    var path = params.path;
-    var token = params.token;
-    var contentBase64 = params.contentBase64;
-    var message = params.message;
-
-    var existing = await getContentMeta(owner, repo, branch, path, token);
+    var existing = await getContentMeta(params.owner, params.repo, params.branch, params.path, params.token);
     var payload = {
-      message: message,
-      content: contentBase64,
-      branch: branch,
+      message: params.message,
+      content: params.contentBase64,
+      branch: params.branch,
     };
-    if (existing && existing.sha) {
-      payload.sha = existing.sha;
-    }
+    if (existing && existing.sha) payload.sha = existing.sha;
 
     return githubFetch(
       API_BASE +
         "/repos/" +
-        encodeURIComponent(owner) +
+        encodeURIComponent(params.owner) +
         "/" +
-        encodeURIComponent(repo) +
+        encodeURIComponent(params.repo) +
         "/contents/" +
-        encodePath(path),
-      token,
+        encodePath(params.path),
+      params.token,
+      { method: "PUT", body: payload }
+    );
+  }
+
+  async function deleteContent(params) {
+    var existing = await getContentMeta(params.owner, params.repo, params.branch, params.path, params.token);
+    if (!existing || !existing.sha) throw new Error("삭제할 파일을 찾지 못했습니다.");
+
+    return githubFetch(
+      API_BASE +
+        "/repos/" +
+        encodeURIComponent(params.owner) +
+        "/" +
+        encodeURIComponent(params.repo) +
+        "/contents/" +
+        encodePath(params.path),
+      params.token,
       {
-        method: "PUT",
-        body: payload,
+        method: "DELETE",
+        body: {
+          message: params.message,
+          sha: existing.sha,
+          branch: params.branch,
+        },
       }
     );
+  }
+
+  async function listPosts(owner, repo, branch, token) {
+    var url =
+      API_BASE +
+      "/repos/" +
+      encodeURIComponent(owner) +
+      "/" +
+      encodeURIComponent(repo) +
+      "/contents/_posts?ref=" +
+      encodeURIComponent(branch);
+    var payload = await githubFetch(url, token, { method: "GET" });
+    if (!Array.isArray(payload)) return [];
+    return payload
+      .filter(function (item) {
+        return item.type === "file" && item.name.endsWith(".md");
+      })
+      .sort(function (a, b) {
+        if (a.name < b.name) return 1;
+        if (a.name > b.name) return -1;
+        return 0;
+      });
+  }
+
+  function renderPostOptions(posts) {
+    postListSelect.innerHTML = "";
+    var placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = posts.length ? "선택하세요" : "포스트 없음";
+    postListSelect.appendChild(placeholder);
+
+    posts.forEach(function (item) {
+      var option = document.createElement("option");
+      option.value = item.path;
+      option.textContent = item.name;
+      postListSelect.appendChild(option);
+    });
   }
 
   async function uploadImage(owner, repo, branch, token, file, prefix, index) {
@@ -465,6 +566,7 @@
       safeBase +
       "." +
       ext;
+
     var base64 = arrayBufferToBase64(await file.arrayBuffer());
     await putContent({
       owner: owner,
@@ -481,24 +583,17 @@
   async function buildUniquePostPath(owner, repo, branch, token, datePrefix, slug) {
     var path = "_posts/" + datePrefix + "-" + slug + ".md";
     var meta = await getContentMeta(owner, repo, branch, path, token);
-    if (!meta) {
-      return path;
-    }
-    var unique = "_posts/" + datePrefix + "-" + slug + "-" + buildTimestamp(new Date()).slice(-6) + ".md";
-    return unique;
+    if (!meta) return path;
+    return "_posts/" + datePrefix + "-" + slug + "-" + buildTimestamp(new Date()).slice(-6) + ".md";
   }
 
   function buildMarkdown(payload) {
     var lines = [];
     lines.push("---");
     lines.push('title: "' + escapeYaml(payload.title) + '"');
-    if (payload.subtitle) {
-      lines.push('subtitle: "' + escapeYaml(payload.subtitle) + '"');
-    }
+    if (payload.subtitle) lines.push('subtitle: "' + escapeYaml(payload.subtitle) + '"');
     lines.push("date: " + payload.dateText);
-    if (payload.coverUrl) {
-      lines.push("cover: " + payload.coverUrl);
-    }
+    if (payload.coverUrl) lines.push("cover: " + payload.coverUrl);
     lines.push("---");
     lines.push("");
     lines.push(payload.body || "오늘 하루를 기록해보세요.");
@@ -516,32 +611,52 @@
     return lines.join("\n").trim() + "\n";
   }
 
+  function ensureConnectionInfo() {
+    var owner = ownerInput.value.trim();
+    var repo = repoInput.value.trim();
+    var branch = branchInput.value.trim() || "main";
+    var token = tokenInput.value.trim();
+    if (!owner || !repo || !token) return null;
+    return { owner: owner, repo: repo, branch: branch, token: token };
+  }
+
+  function resetDraftMode() {
+    currentPostPathInput.value = "";
+    titleInput.value = "";
+    subtitleInput.value = "";
+    bodyInput.value = "";
+    coverUrlInput.value = "";
+    coverInput.value = "";
+    galleryInput.value = "";
+    appendGalleryInput.checked = true;
+    dateInput.value = formatDatetimeLocal(new Date());
+    updatePreview();
+    setStatus("새 글 모드로 전환했습니다.", "status-info");
+  }
+
   async function fillOwnerFromUser(token) {
     try {
       var me = await githubFetch(API_BASE + "/user", token, { method: "GET" });
-      if (!ownerInput.value.trim() && me && me.login) {
-        ownerInput.value = me.login;
-      }
+      if (!ownerInput.value.trim() && me && me.login) ownerInput.value = me.login;
       if (me && me.login) {
         setOAuthStatus("OAuth 연결됨: @" + me.login, "status-success");
       } else {
         setOAuthStatus("OAuth 연결됨", "status-success");
       }
-    } catch (error) {
+    } catch (_error) {
       setOAuthStatus("토큰은 저장됐지만 사용자 확인에 실패했습니다.", "status-info");
     }
   }
 
   async function beginOAuthLogin() {
     if (!oauthClientIdInput || !oauthProxyUrlInput) return;
-
     var clientId = oauthClientIdInput.value.trim();
     var proxyUrl = normalizeUrl(oauthProxyUrlInput.value);
+
     if (!clientId || !proxyUrl) {
       setOAuthStatus("OAuth Client ID와 OAuth Proxy URL을 먼저 입력하세요.", "status-error");
       return;
     }
-
     if (!window.crypto || !window.crypto.subtle) {
       setOAuthStatus("이 브라우저는 OAuth PKCE를 지원하지 않습니다.", "status-error");
       return;
@@ -597,8 +712,7 @@
     if (!params.get("code") && !params.get("error")) return;
 
     if (params.get("error")) {
-      var errText = params.get("error_description") || params.get("error");
-      setOAuthStatus("OAuth 승인 실패: " + errText, "status-error");
+      setOAuthStatus("OAuth 승인 실패: " + (params.get("error_description") || params.get("error")), "status-error");
       clearOAuthParamsFromUrl();
       return;
     }
@@ -613,7 +727,7 @@
     var pending = null;
     try {
       pending = JSON.parse(pendingRaw);
-    } catch (error) {
+    } catch (_error) {
       pending = null;
     }
     if (!pending) {
@@ -651,33 +765,137 @@
 
       tokenInput.value = exchanged.access_token;
       await fillOwnerFromUser(exchanged.access_token);
-
-      if (rememberTokenInput.checked) {
-        saveConfig();
-      }
+      if (rememberTokenInput.checked) saveConfig();
 
       sessionStorage.removeItem(OAUTH_PENDING_KEY);
       clearOAuthParamsFromUrl();
     } catch (error) {
       setOAuthStatus("OAuth 토큰 교환 실패: " + error.message, "status-error");
       clearOAuthParamsFromUrl();
+    } finally {
+      oauthLoginButton.disabled = false;
+      oauthLoginButton.textContent = "GitHub로 로그인";
+    }
+  }
+
+  async function loadPostList() {
+    var info = ensureConnectionInfo();
+    if (!info) {
+      setStatus("목록 조회 전 Owner/Repo/Token(또는 OAuth 로그인)을 설정하세요.", "status-error");
+      return;
+    }
+
+    try {
+      loadPostsButton.disabled = true;
+      loadPostsButton.textContent = "조회 중...";
+      setStatus("포스트 목록을 불러오는 중...", "status-info");
+      var posts = await listPosts(info.owner, info.repo, info.branch, info.token);
+      renderPostOptions(posts);
+      setStatus("포스트 목록을 불러왔습니다. (" + posts.length + "개)", "status-success");
+    } catch (error) {
+      setStatus("목록 조회 실패: " + error.message, "status-error");
+    } finally {
+      loadPostsButton.disabled = false;
+      loadPostsButton.textContent = "목록 새로고침";
+    }
+  }
+
+  async function loadSelectedPost() {
+    var info = ensureConnectionInfo();
+    if (!info) {
+      setStatus("불러오기 전 Owner/Repo/Token(또는 OAuth 로그인)을 설정하세요.", "status-error");
+      return;
+    }
+
+    var path = postListSelect.value;
+    if (!path) {
+      setStatus("불러올 포스트를 먼저 선택하세요.", "status-error");
+      return;
+    }
+
+    try {
+      loadSelectedPostButton.disabled = true;
+      loadSelectedPostButton.textContent = "불러오는 중...";
+      setStatus("포스트 내용을 불러오는 중...", "status-info");
+
+      var meta = await getContentMeta(info.owner, info.repo, info.branch, path, info.token);
+      if (!meta || !meta.content) throw new Error("포스트 내용을 찾지 못했습니다.");
+
+      var markdown = base64ToUtf8(meta.content);
+      var parsed = parseMarkdown(markdown);
+      titleInput.value = parsed.data.title || "";
+      subtitleInput.value = parsed.data.subtitle || "";
+      coverUrlInput.value = parsed.data.cover || "";
+      bodyInput.value = parsed.body.replace(/^\n+/, "");
+      currentPostPathInput.value = path;
+      coverInput.value = "";
+      galleryInput.value = "";
+      appendGalleryInput.checked = false;
+
+      var loadedDate = datetimeLocalFromString(parsed.data.date);
+      if (loadedDate) dateInput.value = loadedDate;
+
+      updatePreview();
+      setStatus("수정 모드로 불러왔습니다: " + path, "status-success");
+    } catch (error) {
+      setStatus("불러오기 실패: " + error.message, "status-error");
+    } finally {
+      loadSelectedPostButton.disabled = false;
+      loadSelectedPostButton.textContent = "선택 글 불러오기";
+    }
+  }
+
+  async function deleteCurrentPost() {
+    var info = ensureConnectionInfo();
+    if (!info) {
+      setStatus("삭제 전 Owner/Repo/Token(또는 OAuth 로그인)을 설정하세요.", "status-error");
+      return;
+    }
+
+    var path = currentPostPathInput.value.trim() || postListSelect.value;
+    if (!path) {
+      setStatus("삭제할 포스트를 먼저 선택하거나 불러오세요.", "status-error");
+      return;
+    }
+
+    if (!window.confirm("정말 삭제할까요?\n" + path)) return;
+
+    try {
+      deleteButton.disabled = true;
+      deleteButton.textContent = "삭제 중...";
+      setStatus("포스트 삭제 중...", "status-info");
+
+      await deleteContent({
+        owner: info.owner,
+        repo: info.repo,
+        branch: info.branch,
+        path: path,
+        token: info.token,
+        message: "Delete diary post: " + path,
+      });
+
+      if (currentPostPathInput.value.trim() === path) resetDraftMode();
+      await loadPostList();
+      setStatus("삭제 완료: " + path, "status-success");
+    } catch (error) {
+      setStatus("삭제 실패: " + error.message, "status-error");
+    } finally {
+      deleteButton.disabled = false;
+      deleteButton.textContent = "현재 글 삭제";
     }
   }
 
   async function publishPost() {
-    var owner = ownerInput.value.trim();
-    var repo = repoInput.value.trim();
-    var branch = branchInput.value.trim() || "main";
-    var token = tokenInput.value.trim();
+    var info = ensureConnectionInfo();
+    if (!info) {
+      setStatus("Owner/Repo/Token(또는 OAuth 로그인)을 먼저 설정하세요.", "status-error");
+      return;
+    }
+
     var title = titleInput.value.trim();
     var subtitle = subtitleInput.value.trim();
     var body = bodyInput.value.trim();
     var appendGallery = appendGalleryInput.checked;
-
-    if (!owner || !repo || !token) {
-      setStatus("Owner/Repo/Token(또는 OAuth 로그인)을 먼저 설정하세요.", "status-error");
-      return;
-    }
     if (!title) {
       setStatus("제목은 필수입니다.", "status-error");
       return;
@@ -690,27 +908,38 @@
 
     try {
       var publishDate = dateInput.value ? new Date(dateInput.value) : new Date();
-      if (Number.isNaN(publishDate.getTime())) {
-        publishDate = new Date();
+      if (Number.isNaN(publishDate.getTime())) publishDate = new Date();
+
+      var currentPath = currentPostPathInput.value.trim();
+      var slug = slugify(title);
+      var postPath = currentPath;
+      if (!postPath) {
+        postPath = await buildUniquePostPath(
+          info.owner,
+          info.repo,
+          info.branch,
+          info.token,
+          formatDatePrefix(publishDate),
+          slug
+        );
       }
 
-      var datePrefix = formatDatePrefix(publishDate);
-      var slug = slugify(title);
-      var postPath = await buildUniquePostPath(owner, repo, branch, token, datePrefix, slug);
-      var coverUrl = "";
+      var coverUrl = coverUrlInput.value.trim();
       var galleryUrls = [];
 
       if (coverInput.files && coverInput.files[0]) {
         setStatus("표지 사진 업로드 중...", "status-info");
-        coverUrl = await uploadImage(owner, repo, branch, token, coverInput.files[0], slug);
+        coverUrl = await uploadImage(info.owner, info.repo, info.branch, info.token, coverInput.files[0], slug);
+        coverUrlInput.value = coverUrl;
       }
 
       if (galleryInput.files && galleryInput.files.length > 0) {
         var i = 0;
         for (i = 0; i < galleryInput.files.length; i += 1) {
           setStatus("본문 사진 업로드 중... (" + (i + 1) + "/" + galleryInput.files.length + ")", "status-info");
-          var url = await uploadImage(owner, repo, branch, token, galleryInput.files[i], slug, i);
-          galleryUrls.push(url);
+          galleryUrls.push(
+            await uploadImage(info.owner, info.repo, info.branch, info.token, galleryInput.files[i], slug, i)
+          );
         }
       }
 
@@ -724,27 +953,28 @@
         galleryUrls: galleryUrls,
       });
 
-      setStatus("포스트 파일 업로드 중...", "status-info");
       await putContent({
-        owner: owner,
-        repo: repo,
-        branch: branch,
+        owner: info.owner,
+        repo: info.repo,
+        branch: info.branch,
         path: postPath,
-        token: token,
+        token: info.token,
         contentBase64: utf8ToBase64(markdown),
-        message: "Add diary post: " + title,
+        message: (currentPath ? "Update" : "Add") + " diary post: " + title,
       });
 
+      currentPostPathInput.value = postPath;
       var githubFileUrl =
         "https://github.com/" +
-        encodeURIComponent(owner) +
+        encodeURIComponent(info.owner) +
         "/" +
-        encodeURIComponent(repo) +
+        encodeURIComponent(info.repo) +
         "/blob/" +
-        encodeURIComponent(branch) +
+        encodeURIComponent(info.branch) +
         "/" +
         postPath;
 
+      await loadPostList();
       setStatus(
         '발행 완료. <a href="' +
           githubFileUrl +
@@ -767,10 +997,7 @@
     });
   }
 
-  if (oauthLoginButton) {
-    oauthLoginButton.addEventListener("click", beginOAuthLogin);
-  }
-
+  if (oauthLoginButton) oauthLoginButton.addEventListener("click", beginOAuthLogin);
   if (oauthLogoutButton) {
     oauthLogoutButton.addEventListener("click", function () {
       tokenInput.value = "";
@@ -779,12 +1006,18 @@
     });
   }
 
+  if (loadPostsButton) loadPostsButton.addEventListener("click", loadPostList);
+  if (loadSelectedPostButton) loadSelectedPostButton.addEventListener("click", loadSelectedPost);
+  if (newDraftButton) newDraftButton.addEventListener("click", resetDraftMode);
+  if (deleteButton) deleteButton.addEventListener("click", deleteCurrentPost);
+
   [
     titleInput,
     subtitleInput,
     dateInput,
     bodyInput,
     coverInput,
+    coverUrlInput,
     galleryInput,
   ].forEach(function (element) {
     element.addEventListener("input", updatePreview);
@@ -794,9 +1027,7 @@
   publishButton.addEventListener("click", publishPost);
 
   loadConfig();
-  if (!dateInput.value) {
-    dateInput.value = formatDatetimeLocal(new Date());
-  }
+  if (!dateInput.value) dateInput.value = formatDatetimeLocal(new Date());
   updatePreview();
   finishOAuthIfReturned();
 })();
