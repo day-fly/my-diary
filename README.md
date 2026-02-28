@@ -41,8 +41,8 @@ GitHub로 관리하는 감성 다이어리 블로그 템플릿입니다.
 
 #### 1) 작성 페이지 열기
 
-- 로컬: `http://127.0.0.1:4001/write/`
-- 배포 후: `https://<your-site>/write/`
+- 로컬: `http://127.0.0.1:4001/my-diary/write/`
+- 배포 후: `https://day-fly.github.io/my-diary/write/`
 
 #### 2) OAuth 로그인 방식 (토큰 입력 없음)
 
@@ -143,7 +143,7 @@ bundle install
 bundle exec jekyll serve --host 127.0.0.1 --port 4001
 ```
 
-브라우저에서 `http://127.0.0.1:4001` 접속.
+브라우저에서 `http://127.0.0.1:4001/my-diary/` 접속.
 
 ## 감성 커스터마이징 포인트
 

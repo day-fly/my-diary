@@ -8,8 +8,8 @@
 GitHub `Settings > Developer settings > OAuth Apps > New OAuth App`
 
 - Application name: `My Diary Writer`
-- Homepage URL: 블로그 주소
-- Authorization callback URL: `https://<your-site>/write/`
+- Homepage URL: `https://day-fly.github.io/my-diary/`
+- Authorization callback URL: `https://day-fly.github.io/my-diary/write/`
 
 생성 후 `Client ID`를 `/write` 페이지의 `OAuth Client ID`에 입력합니다.
 

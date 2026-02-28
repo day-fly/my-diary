@@ -4,5 +4,4 @@ compatibility_date = "2026-02-28"
 
 [vars]
 # e.g. https://username.github.io
-ALLOWED_ORIGIN = "https://example.com"
-
+ALLOWED_ORIGIN = "https://day-fly.github.io"
