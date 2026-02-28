@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-label="Diary cover image">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f7e8da" />
+      <stop offset="100%" stop-color="#f1d2b8" />
+    </linearGradient>
+    <linearGradient id="blob" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#d07f61" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#a25b43" stop-opacity="0.35" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)" />
+  <circle cx="320" cy="210" r="170" fill="#fff6eb" opacity="0.7" />
+  <circle cx="1320" cy="740" r="250" fill="#fff1e2" opacity="0.65" />
+  <path d="M470 660C590 520 740 470 920 500C1080 525 1190 610 1260 750L250 750C320 725 390 700 470 660Z" fill="url(#blob)" />
+  <text x="50%" y="46%" text-anchor="middle" font-family="'Noto Serif KR', serif" font-size="66" fill="#553424">My Diary</text>
+  <text x="50%" y="55%" text-anchor="middle" font-family="'Noto Serif KR', serif" font-size="30" fill="#6f4a37">하루를 담아두는 기록</text>
+</svg>
+

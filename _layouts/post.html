@@ -1,0 +1,21 @@
+---
+layout: default
+---
+<article class="post">
+  <header class="post-header">
+    <p class="post-date">{{ page.date | date: "%Y.%m.%d" }}</p>
+    <h1>{{ page.title }}</h1>
+    {% if page.subtitle %}
+      <p class="post-subtitle">{{ page.subtitle }}</p>
+    {% endif %}
+  </header>
+
+  {% if page.cover %}
+    <figure class="post-cover">
+      <img src="{{ page.cover | relative_url }}" alt="{{ page.title }} 대표 이미지" />
+    </figure>
+  {% endif %}
+
+  <section class="post-content">{{ content }}</section>
+</article>
+

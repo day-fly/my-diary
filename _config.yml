@@ -1,0 +1,22 @@
+title: "My Diary"
+description: "나의 일상을 기록하는 감성 다이어리"
+url: ""
+baseurl: ""
+lang: "ko-KR"
+timezone: "Asia/Seoul"
+
+markdown: kramdown
+permalink: /:year/:month/:day/:title/
+
+collections:
+  pages:
+    output: true
+
+defaults:
+  - scope:
+      path: ""
+      type: "posts"
+    values:
+      layout: "post"
+      author: "me"
+

@@ -1,0 +1,39 @@
+---
+layout: default
+title: "Diary"
+---
+<section class="hero">
+  <p class="hero-kicker">MY DAILY ARCHIVE</p>
+  <h1>하루를 조용히 모아두는 공간</h1>
+  <p>
+    사진 한 장, 짧은 메모 하나도 소중한 기록이 되도록.
+    GitHub로 관리하는 나만의 다이어리 블로그입니다.
+  </p>
+</section>
+
+<section class="post-list">
+  {% if site.posts.size > 0 %}
+    {% for post in site.posts %}
+      <article class="post-card">
+        <a href="{{ post.url | relative_url }}" class="post-card-link">
+          {% if post.cover %}
+            <div class="post-card-image">
+              <img src="{{ post.cover | relative_url }}" alt="{{ post.title }} 썸네일" />
+            </div>
+          {% endif %}
+          <div class="post-card-body">
+            <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
+            <h2>{{ post.title }}</h2>
+            {% if post.subtitle %}
+              <p class="post-card-subtitle">{{ post.subtitle }}</p>
+            {% endif %}
+            <p class="post-card-excerpt">{{ post.excerpt | strip_html | truncate: 120 }}</p>
+          </div>
+        </a>
+      </article>
+    {% endfor %}
+  {% else %}
+    <p class="empty-state">아직 작성된 기록이 없어요. 첫 글을 남겨보세요.</p>
+  {% endif %}
+</section>
+
