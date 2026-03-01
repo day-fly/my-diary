@@ -353,6 +353,12 @@ body {
   min-height: 360px;
 }
 
+.writer-tip {
+  margin: -4px 0 0;
+  color: #7d6c5c;
+  font-size: 0.82rem;
+}
+
 .writer-inline {
   margin-top: 12px;
   display: flex;

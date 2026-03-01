@@ -49,6 +49,10 @@ permalink: /write/
         본문 내용 (Markdown)
         <textarea id="post-body" rows="18" placeholder="오늘 하루를 자유롭게 작성해보세요."></textarea>
       </label>
+      <p class="writer-tip">
+        본문 입력창에서 <code>Ctrl/Cmd + V</code>로 이미지를 붙여넣으면
+        <code>assets/photos/</code>에 업로드되고 본문에 자동 삽입됩니다.
+      </p>
     </div>
 
     <div class="writer-fields writer-fields-two">

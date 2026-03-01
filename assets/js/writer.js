@@ -179,6 +179,15 @@
     return "jpg";
   }
 
+  function extensionFromMime(type) {
+    var mime = (type || "").toLowerCase();
+    if (mime === "image/png") return "png";
+    if (mime === "image/webp") return "webp";
+    if (mime === "image/gif") return "gif";
+    if (mime === "image/jpeg" || mime === "image/jpg") return "jpg";
+    return "png";
+  }
+
   function buildTimestamp(date) {
     return [
       date.getFullYear(),
@@ -250,6 +259,36 @@
       bytes[i] = binary.charCodeAt(i);
     }
     return new TextDecoder().decode(bytes);
+  }
+
+  function insertTextAtCursor(textarea, text) {
+    var start = typeof textarea.selectionStart === "number" ? textarea.selectionStart : textarea.value.length;
+    var end = typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : textarea.value.length;
+    var before = textarea.value.slice(0, start);
+    var after = textarea.value.slice(end);
+    textarea.value = before + text + after;
+    var cursor = start + text.length;
+    textarea.selectionStart = cursor;
+    textarea.selectionEnd = cursor;
+  }
+
+  function getClipboardImageFiles(event) {
+    var files = [];
+    if (!event.clipboardData || !event.clipboardData.items) return files;
+
+    Array.prototype.forEach.call(event.clipboardData.items, function (item, index) {
+      if (!item || !item.type || item.type.indexOf("image/") !== 0) return;
+      var file = item.getAsFile();
+      if (!file) return;
+
+      if (!file.name) {
+        var ext = extensionFromMime(file.type);
+        file = new File([file], "pasted-image-" + (index + 1) + "." + ext, { type: file.type || "image/png" });
+      }
+      files.push(file);
+    });
+
+    return files;
   }
 
   function randomString(size) {
@@ -889,6 +928,39 @@
     }
   }
 
+  async function handleBodyPaste(event) {
+    var imageFiles = getClipboardImageFiles(event);
+    if (!imageFiles.length) return;
+
+    var info = ensureConnectionInfo();
+    if (!info) {
+      setStatus("이미지 붙여넣기를 쓰려면 먼저 GitHub 연결(OAuth/PAT)을 완료하세요.", "status-error");
+      return;
+    }
+
+    event.preventDefault();
+
+    var prefixBase = titleInput.value.trim() ? slugify(titleInput.value.trim()) : "pasted";
+    var inserted = [];
+
+    try {
+      setStatus("붙여넣은 이미지 업로드 중...", "status-info");
+      var i = 0;
+      for (i = 0; i < imageFiles.length; i += 1) {
+        var url = await uploadImage(info.owner, info.repo, info.branch, info.token, imageFiles[i], prefixBase, i);
+        inserted.push("![붙여넣은 이미지 " + (i + 1) + "](" + url + ")");
+      }
+
+      var block = "\n" + inserted.join("\n\n") + "\n";
+      bodyInput.focus();
+      insertTextAtCursor(bodyInput, block);
+      updatePreview();
+      setStatus("붙여넣은 이미지 업로드 완료", "status-success");
+    } catch (error) {
+      setStatus("붙여넣기 업로드 실패: " + error.message, "status-error");
+    }
+  }
+
   async function publishPost() {
     var info = ensureConnectionInfo();
     if (!info) {
@@ -1014,6 +1086,7 @@
   if (loadSelectedPostButton) loadSelectedPostButton.addEventListener("click", loadSelectedPost);
   if (newDraftButton) newDraftButton.addEventListener("click", resetDraftMode);
   if (deleteButton) deleteButton.addEventListener("click", deleteCurrentPost);
+  if (bodyInput) bodyInput.addEventListener("paste", handleBodyPaste);
 
   [
     titleInput,
