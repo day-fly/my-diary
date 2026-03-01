@@ -1,7 +1,7 @@
-# My Diary
+# Day-Fly Writing Room
 
-GitHub로 관리하는 감성 다이어리 블로그 템플릿입니다.  
-사진 업로드 + 글 작성(마크다운) 중심으로 만들었고, 모바일 반응형까지 포함되어 있습니다.
+GitHub로 관리하는 개인 글 아카이브 템플릿입니다.  
+시, 에세이, 일상 메모를 마크다운으로 작성하고 사진과 함께 발행할 수 있습니다.
 
 ## 포함된 기능
 
@@ -16,7 +16,7 @@ GitHub로 관리하는 감성 다이어리 블로그 템플릿입니다.
 
 ```text
 .
-├─ _posts/                # 다이어리 글 (YYYY-MM-DD-title.md)
+├─ _posts/                # 글 포스트 (YYYY-MM-DD-title.md)
 ├─ _layouts/              # 공통 레이아웃
 ├─ assets/
 │  ├─ css/style.css       # 스타일

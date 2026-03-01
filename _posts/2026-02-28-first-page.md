@@ -4,8 +4,8 @@ subtitle: "오늘부터 나의 하루를 기록하기"
 date: 2026-02-28 09:00:00 +0900
 cover: /assets/images/welcome-cover.svg
 ---
-처음 시작하는 다이어리.
-오늘의 공기, 머릿속 생각, 작지만 선명했던 순간들을 천천히 남겨보려고 한다.
+처음 시작하는 글방.
+시가 될지도, 에세이가 될지도 모를 문장들을 천천히 남겨보려고 한다.
 
 ![오늘의 분위기](/assets/images/welcome-cover.svg)
 
@@ -19,4 +19,3 @@ cover: /assets/images/welcome-cover.svg
 
 다음 글부터는 `assets/photos/` 폴더에 사진을 올리고,
 마크다운에서 `![설명](/assets/photos/파일명.jpg)` 형식으로 붙이면 된다.
-

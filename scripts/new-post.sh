@@ -14,7 +14,7 @@ Usage:
   ./scripts/new-post.sh "제목" "부제목" "/path/to/photo.jpg"
 
 Description:
-  대화형 입력 또는 인자를 이용해 다이어리 포스트를 자동 생성합니다.
+  대화형 입력 또는 인자를 이용해 새 글 포스트를 자동 생성합니다.
 EOF
 }
 

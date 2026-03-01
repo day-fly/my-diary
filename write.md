@@ -6,10 +6,10 @@ permalink: /write/
 <section class="writer-page">
   <div class="writer-hero">
     <p class="writer-kicker">DIARY WRITER</p>
-    <h1>포스트 작성에 집중하는 에디터</h1>
+    <h1>문장 작성에 집중하는 에디터</h1>
     <p>
-      연결 정보는 접어두고, 글 작성 영역을 넓게 구성했습니다.
-      기존 글 불러오기/수정/삭제도 이 화면에서 처리할 수 있습니다.
+      시, 에세이, 메모를 편하게 쓰도록
+      작성 영역을 넓게 구성했습니다. 기존 글 불러오기/수정/삭제도 가능합니다.
     </p>
   </div>
 
@@ -157,4 +157,3 @@ permalink: /write/
 </section>
 
 <script src="{{ '/assets/js/writer.js' | relative_url }}" defer></script>
-
