@@ -1,14 +1,10 @@
 ---
 layout: default
-title: "Writing"
+title: "글방"
 ---
-<section class="hero">
-  <p class="hero-kicker">WORDS & DAYS</p>
+<section class="page-intro">
   <h1>시와 에세이, 그리고 일상을 적어두는 글방</h1>
-  <p>
-    완성된 문장도, 흘러가는 메모도 모두 머물 수 있도록.
-    GitHub로 관리하는 개인 글 아카이브입니다.
-  </p>
+  <p>완성된 문장도, 흘러가는 메모도 모두 머물 수 있도록.</p>
 </section>
 
 <section class="post-list">
@@ -22,7 +18,12 @@ title: "Writing"
             </div>
           {% endif %}
           <div class="post-card-body">
-            <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
+            <div class="post-meta">
+              <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
+              {% if post.category %}
+                <span class="category-chip">{{ post.category }}</span>
+              {% endif %}
+            </div>
             <h2>{{ post.title }}</h2>
             {% if post.subtitle %}
               <p class="post-card-subtitle">{{ post.subtitle }}</p>

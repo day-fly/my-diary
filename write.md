@@ -4,15 +4,6 @@ title: Write
 permalink: /write/
 ---
 <section class="writer-page">
-  <div class="writer-hero">
-    <p class="writer-kicker">DIARY WRITER</p>
-    <h1>문장 작성에 집중하는 에디터</h1>
-    <p>
-      시, 에세이, 메모를 편하게 쓰도록
-      작성 영역을 넓게 구성했습니다. 기존 글 불러오기/수정/삭제도 가능합니다.
-    </p>
-  </div>
-
   <section class="writer-panel writer-main-panel">
     <div class="writer-main-head">
       <h2>포스트 작성</h2>
@@ -23,7 +14,7 @@ permalink: /write/
       </div>
     </div>
 
-    <div class="writer-fields writer-fields-three">
+    <div class="writer-fields writer-fields-four">
       <label>
         제목
         <input id="post-title" type="text" placeholder="오늘의 기록 제목" autocomplete="off" />
@@ -31,6 +22,14 @@ permalink: /write/
       <label>
         부제목
         <input id="post-subtitle" type="text" placeholder="선택 사항" autocomplete="off" />
+      </label>
+      <label>
+        카테고리
+        <select id="post-category">
+          <option value="시">시</option>
+          <option value="에세이">에세이</option>
+          <option value="일기" selected>일기</option>
+        </select>
       </label>
       <label>
         작성 시각
@@ -147,6 +146,7 @@ permalink: /write/
     <h2>미리보기</h2>
     <article class="writer-preview">
       <p id="preview-date" class="preview-date"></p>
+      <p id="preview-category" class="preview-category"></p>
       <h3 id="preview-title">제목을 입력하세요</h3>
       <p id="preview-subtitle" class="preview-subtitle"></p>
       <div id="preview-cover" class="preview-cover"></div>

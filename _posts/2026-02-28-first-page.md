@@ -1,6 +1,7 @@
 ---
 title: "첫 페이지를 열며"
 subtitle: "오늘부터 나의 하루를 기록하기"
+category: "에세이"
 date: 2026-02-28 09:00:00 +0900
 cover: /assets/images/welcome-cover.svg
 ---

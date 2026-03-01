@@ -113,6 +113,7 @@ fi
   if [[ -n "$subtitle" ]]; then
     echo "subtitle: \"$subtitle_yaml\""
   fi
+  echo 'category: "일기"'
   echo "date: $timestamp"
   if [[ -n "$cover_line" ]]; then
     echo "$cover_line"

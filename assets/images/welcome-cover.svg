@@ -13,6 +13,6 @@
   <circle cx="320" cy="210" r="170" fill="#fff6eb" opacity="0.7" />
   <circle cx="1320" cy="740" r="250" fill="#fff1e2" opacity="0.65" />
   <path d="M470 660C590 520 740 470 920 500C1080 525 1190 610 1260 750L250 750C320 725 390 700 470 660Z" fill="url(#blob)" />
-  <text x="50%" y="46%" text-anchor="middle" font-family="'Noto Serif KR', serif" font-size="62" fill="#553424">Writing Room</text>
-  <text x="50%" y="55%" text-anchor="middle" font-family="'Noto Serif KR', serif" font-size="30" fill="#6f4a37">시와 에세이를 담아두는 공간</text>
+  <text x="50%" y="46%" text-anchor="middle" font-family="'Noto Serif KR', serif" font-size="62" fill="#553424">마음의 가장자리</text>
+  <text x="50%" y="55%" text-anchor="middle" font-family="'Noto Serif KR', serif" font-size="30" fill="#6f4a37">시와 에세이, 일상을 담아두는 공간</text>
 </svg>
