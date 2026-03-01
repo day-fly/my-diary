@@ -311,6 +311,204 @@
     return text;
   }
 
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function extractMarkdownUrl(rawUrl) {
+    var url = (rawUrl || "").trim();
+    if (!url) return "";
+    if (url.startsWith("<") && url.endsWith(">")) url = url.slice(1, -1);
+    if (/\s+/.test(url)) url = url.split(/\s+/)[0];
+    return url;
+  }
+
+  function toSafePreviewUrl(rawUrl) {
+    var url = extractMarkdownUrl(rawUrl);
+    if (!url) return "";
+    var resolved = toPreviewAssetUrl(url);
+    if (!resolved) return "";
+    if (/^javascript:/i.test(resolved)) return "";
+    return resolved;
+  }
+
+  function renderInlineMarkdown(text) {
+    var html = escapeHtml(text);
+    var codeTokens = [];
+
+    html = html.replace(/`([^`]+)`/g, function (_match, codeText) {
+      var token = "@@CODE_SPAN_" + codeTokens.length + "@@";
+      codeTokens.push("<code>" + codeText + "</code>");
+      return token;
+    });
+
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_match, altText, rawUrl) {
+      var url = toSafePreviewUrl(rawUrl);
+      if (!url) return altText;
+      return '<img src="' + escapeHtml(url) + '" alt="' + altText + '" loading="lazy" />';
+    });
+
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_match, label, rawUrl) {
+      var url = toSafePreviewUrl(rawUrl);
+      if (!url) return label;
+      return (
+        '<a href="' +
+        escapeHtml(url) +
+        '" target="_blank" rel="noopener noreferrer">' +
+        label +
+        "</a>"
+      );
+    });
+
+    html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+    html = html.replace(/@@CODE_SPAN_(\d+)@@/g, function (_match, indexText) {
+      var index = Number(indexText);
+      return codeTokens[index] || "";
+    });
+
+    return html;
+  }
+
+  function renderMarkdownPreview(markdown) {
+    var source = String(markdown || "").replace(/\r\n?/g, "\n").trim();
+    if (!source) {
+      return '<p class="preview-empty">내용 미리보기가 여기에 표시됩니다.</p>';
+    }
+
+    var lines = source.split("\n");
+    var htmlParts = [];
+    var paragraphLines = [];
+    var quoteLines = [];
+    var listType = "";
+    var listItems = [];
+    var inCodeFence = false;
+    var codeLines = [];
+    var i = 0;
+
+    function flushParagraph() {
+      if (!paragraphLines.length) return;
+      htmlParts.push("<p>" + paragraphLines.map(renderInlineMarkdown).join("<br />") + "</p>");
+      paragraphLines = [];
+    }
+
+    function flushQuote() {
+      if (!quoteLines.length) return;
+      htmlParts.push("<blockquote><p>" + quoteLines.map(renderInlineMarkdown).join("<br />") + "</p></blockquote>");
+      quoteLines = [];
+    }
+
+    function flushList() {
+      if (!listItems.length || !listType) return;
+      htmlParts.push("<" + listType + ">");
+      listItems.forEach(function (item) {
+        htmlParts.push("<li>" + renderInlineMarkdown(item) + "</li>");
+      });
+      htmlParts.push("</" + listType + ">");
+      listType = "";
+      listItems = [];
+    }
+
+    function flushCodeFence() {
+      if (!inCodeFence) return;
+      htmlParts.push("<pre><code>" + escapeHtml(codeLines.join("\n")) + "</code></pre>");
+      inCodeFence = false;
+      codeLines = [];
+    }
+
+    for (i = 0; i < lines.length; i += 1) {
+      var line = lines[i];
+      var quoteMatch = null;
+      var headingMatch = null;
+      var orderedMatch = null;
+      var unorderedMatch = null;
+
+      if (inCodeFence) {
+        if (/^\s*```/.test(line)) {
+          flushCodeFence();
+        } else {
+          codeLines.push(line);
+        }
+        continue;
+      }
+
+      if (/^\s*```/.test(line)) {
+        flushParagraph();
+        flushQuote();
+        flushList();
+        inCodeFence = true;
+        codeLines = [];
+        continue;
+      }
+
+      if (!line.trim()) {
+        flushParagraph();
+        flushQuote();
+        flushList();
+        continue;
+      }
+
+      quoteMatch = line.match(/^\s*>\s?(.*)$/);
+      if (quoteMatch) {
+        flushParagraph();
+        flushList();
+        quoteLines.push(quoteMatch[1]);
+        continue;
+      }
+      flushQuote();
+
+      headingMatch = line.match(/^\s*(#{1,3})\s+(.+)$/);
+      if (headingMatch) {
+        flushParagraph();
+        flushList();
+        htmlParts.push(
+          "<h" +
+            headingMatch[1].length +
+            ">" +
+            renderInlineMarkdown(headingMatch[2].trim()) +
+            "</h" +
+            headingMatch[1].length +
+            ">"
+        );
+        continue;
+      }
+
+      orderedMatch = line.match(/^\s*\d+\.\s+(.+)$/);
+      if (orderedMatch) {
+        flushParagraph();
+        if (listType && listType !== "ol") flushList();
+        listType = "ol";
+        listItems.push(orderedMatch[1]);
+        continue;
+      }
+
+      unorderedMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+      if (unorderedMatch) {
+        flushParagraph();
+        if (listType && listType !== "ul") flushList();
+        listType = "ul";
+        listItems.push(unorderedMatch[1]);
+        continue;
+      }
+
+      flushList();
+      paragraphLines.push(line);
+    }
+
+    flushCodeFence();
+    flushParagraph();
+    flushQuote();
+    flushList();
+
+    return htmlParts.join("");
+  }
+
   function parseMarkdown(markdown) {
     var match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
     if (!match) return { data: {}, body: markdown };
@@ -403,7 +601,7 @@
     categoryChip.textContent = categoryText;
     previewCategory.appendChild(categoryChip);
     previewTitle.textContent = titleInput.value.trim() || "제목을 입력하세요";
-    previewBody.textContent = bodyInput.value.trim() || "내용 미리보기가 여기에 표시됩니다.";
+    previewBody.innerHTML = renderMarkdownPreview(bodyInput.value);
 
     clearPreviewUrls();
     previewCover.innerHTML = "";

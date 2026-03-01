@@ -149,7 +149,7 @@ permalink: /write/
       <p id="preview-category" class="preview-category"></p>
       <h3 id="preview-title">제목을 입력하세요</h3>
       <div id="preview-cover" class="preview-cover"></div>
-      <div id="preview-body" class="preview-body"></div>
+      <div id="preview-body" class="preview-body post-content"></div>
       <div id="preview-gallery" class="preview-gallery"></div>
     </article>
   </section>

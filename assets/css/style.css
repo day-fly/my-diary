@@ -419,6 +419,33 @@ body {
   font-size: 0.9em;
 }
 
+.post-content pre {
+  margin: 1.1em 0;
+  padding: 0.9em 1em;
+  border-radius: 10px;
+  background: #eef0fb;
+  overflow: auto;
+}
+
+.post-content pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.post-content ul,
+.post-content ol {
+  margin: 0.3em 0 1.1em;
+  padding-left: 1.3em;
+}
+
+.post-content li + li {
+  margin-top: 0.28em;
+}
+
+.post-content a {
+  color: #5966ae;
+}
+
 .post-pager {
   margin-top: 28px;
   padding-top: 18px;
@@ -705,8 +732,20 @@ body {
 
 .preview-body {
   margin-top: 16px;
-  white-space: pre-wrap;
   color: #42476f;
+}
+
+.preview-body > :first-child {
+  margin-top: 0;
+}
+
+.preview-body > :last-child {
+  margin-bottom: 0;
+}
+
+.preview-empty {
+  margin: 0;
+  color: var(--ink-soft);
 }
 
 .preview-gallery {
