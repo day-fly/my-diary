@@ -6,6 +6,8 @@ lang: "ko-KR"
 timezone: "Asia/Seoul"
 
 markdown: kramdown
+kramdown:
+  hard_wrap: true
 permalink: /:year/:month/:day/:title/
 
 collections:
