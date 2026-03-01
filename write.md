@@ -14,14 +14,10 @@ permalink: /write/
       </div>
     </div>
 
-    <div class="writer-fields writer-fields-four">
+    <div class="writer-fields writer-fields-three">
       <label>
         제목
         <input id="post-title" type="text" placeholder="오늘의 기록 제목" autocomplete="off" />
-      </label>
-      <label>
-        부제목
-        <input id="post-subtitle" type="text" placeholder="선택 사항" autocomplete="off" />
       </label>
       <label>
         카테고리
@@ -148,7 +144,6 @@ permalink: /write/
       <p id="preview-date" class="preview-date"></p>
       <p id="preview-category" class="preview-category"></p>
       <h3 id="preview-title">제목을 입력하세요</h3>
-      <p id="preview-subtitle" class="preview-subtitle"></p>
       <div id="preview-cover" class="preview-cover"></div>
       <div id="preview-body" class="preview-body"></div>
       <div id="preview-gallery" class="preview-gallery"></div>

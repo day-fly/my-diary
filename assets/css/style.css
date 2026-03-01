@@ -185,12 +185,6 @@ body {
   line-height: 1.4;
 }
 
-.post-card-subtitle {
-  margin: 0 0 10px;
-  color: var(--accent);
-  font-size: 0.94rem;
-}
-
 .post-card-excerpt {
   margin: 0;
   color: #5d5045;
@@ -227,11 +221,6 @@ body {
 
 .post-meta-line .post-date {
   margin: 0;
-}
-
-.post-subtitle {
-  margin-top: 10px;
-  color: var(--accent);
 }
 
 .post-cover {
@@ -338,10 +327,6 @@ body {
 
 .writer-fields-three {
   grid-template-columns: 1.5fr 1fr 1fr;
-}
-
-.writer-fields-four {
-  grid-template-columns: 1.5fr 1fr 0.8fr 1fr;
 }
 
 .writer-fields label {
@@ -512,11 +497,6 @@ body {
   line-height: 1.35;
 }
 
-.preview-subtitle {
-  margin: 8px 0 0;
-  color: var(--accent);
-}
-
 .preview-cover {
   margin-top: 14px;
 }
@@ -604,7 +584,6 @@ body {
   }
 
   .writer-fields-three,
-  .writer-fields-four,
   .writer-fields-two {
     grid-template-columns: 1fr;
   }

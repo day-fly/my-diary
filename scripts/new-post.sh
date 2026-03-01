@@ -10,8 +10,7 @@ usage() {
 Usage:
   ./scripts/new-post.sh
   ./scripts/new-post.sh "제목"
-  ./scripts/new-post.sh "제목" "부제목"
-  ./scripts/new-post.sh "제목" "부제목" "/path/to/photo.jpg"
+  ./scripts/new-post.sh "제목" "/path/to/photo.jpg"
 
 Description:
   대화형 입력 또는 인자를 이용해 새 글 포스트를 자동 생성합니다.
@@ -52,8 +51,7 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 title="${1:-}"
-subtitle="${2:-}"
-image_path="${3:-}"
+image_path="${2:-}"
 
 if [[ -z "$title" ]]; then
   read -r -p "제목: " title
@@ -65,10 +63,6 @@ if [[ -z "$title" ]]; then
 fi
 
 if [[ -z "${2:-}" ]]; then
-  read -r -p "부제목(선택): " subtitle
-fi
-
-if [[ -z "${3:-}" ]]; then
   read -r -p "사진 경로(선택): " image_path
 fi
 
@@ -87,7 +81,6 @@ fi
 cover_line=""
 image_markdown=""
 title_yaml="$(escape_yaml_double "$title")"
-subtitle_yaml="$(escape_yaml_double "$subtitle")"
 
 if [[ -n "$image_path" ]]; then
   if [[ ! -f "$image_path" ]]; then
@@ -110,9 +103,6 @@ fi
 {
   echo "---"
   echo "title: \"$title_yaml\""
-  if [[ -n "$subtitle" ]]; then
-    echo "subtitle: \"$subtitle_yaml\""
-  fi
   echo 'category: "일기"'
   echo "date: $timestamp"
   if [[ -n "$cover_line" ]]; then

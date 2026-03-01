@@ -26,7 +26,6 @@
   var oauthStatusElement = document.getElementById("oauth-status");
 
   var titleInput = document.getElementById("post-title");
-  var subtitleInput = document.getElementById("post-subtitle");
   var categoryInput = document.getElementById("post-category");
   var dateInput = document.getElementById("post-date");
   var coverInput = document.getElementById("cover-image");
@@ -47,7 +46,6 @@
   var previewDate = document.getElementById("preview-date");
   var previewCategory = document.getElementById("preview-category");
   var previewTitle = document.getElementById("preview-title");
-  var previewSubtitle = document.getElementById("preview-subtitle");
   var previewCover = document.getElementById("preview-cover");
   var previewBody = document.getElementById("preview-body");
   var previewGallery = document.getElementById("preview-gallery");
@@ -366,8 +364,6 @@
     categoryChip.textContent = categoryText;
     previewCategory.appendChild(categoryChip);
     previewTitle.textContent = titleInput.value.trim() || "제목을 입력하세요";
-    previewSubtitle.textContent = subtitleInput.value.trim();
-    previewSubtitle.style.display = subtitleInput.value.trim() ? "block" : "none";
     previewBody.textContent = bodyInput.value.trim() || "내용 미리보기가 여기에 표시됩니다.";
 
     clearPreviewUrls();
@@ -599,7 +595,6 @@
     var lines = [];
     lines.push("---");
     lines.push('title: "' + escapeYaml(payload.title) + '"');
-    if (payload.subtitle) lines.push('subtitle: "' + escapeYaml(payload.subtitle) + '"');
     lines.push('category: "' + escapeYaml(payload.category || "일기") + '"');
     lines.push("date: " + payload.dateText);
     if (payload.coverUrl) lines.push("cover: " + payload.coverUrl);
@@ -632,7 +627,6 @@
   function resetDraftMode() {
     currentPostPathInput.value = "";
     titleInput.value = "";
-    subtitleInput.value = "";
     categoryInput.value = "일기";
     bodyInput.value = "";
     coverUrlInput.value = "";
@@ -834,7 +828,6 @@
       var markdown = base64ToUtf8(meta.content);
       var parsed = parseMarkdown(markdown);
       titleInput.value = parsed.data.title || "";
-      subtitleInput.value = parsed.data.subtitle || "";
       categoryInput.value = parsed.data.category || "일기";
       coverUrlInput.value = parsed.data.cover || "";
       bodyInput.value = parsed.body.replace(/^\n+/, "");
@@ -904,7 +897,6 @@
     }
 
     var title = titleInput.value.trim();
-    var subtitle = subtitleInput.value.trim();
     var category = categoryInput.value.trim() || "일기";
     var body = bodyInput.value.trim();
     var appendGallery = appendGalleryInput.checked;
@@ -957,7 +949,6 @@
 
       var markdown = buildMarkdown({
         title: title,
-        subtitle: subtitle,
         category: category,
         dateText: formatFrontMatterDate(publishDate),
         coverUrl: coverUrl,
@@ -1026,7 +1017,6 @@
 
   [
     titleInput,
-    subtitleInput,
     categoryInput,
     dateInput,
     bodyInput,
