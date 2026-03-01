@@ -355,7 +355,7 @@ body {
 }
 
 .post-header h1 {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: clamp(1.8rem, 5vw, 3rem);
   line-height: 1.2;
   font-family: "Cormorant Garamond", serif;
@@ -392,6 +392,10 @@ body {
 .post-content {
   color: #3d4269;
   font-size: 1.02rem;
+}
+
+.post-header + .post-content {
+  margin-top: 24px;
 }
 
 .post-content p {
@@ -715,13 +719,17 @@ body {
 }
 
 .writer-preview h3 {
-  margin: 0;
+  margin: 0 0 4px;
   font-size: 1.45rem;
   line-height: 1.35;
 }
 
 .preview-cover {
   margin-top: 14px;
+}
+
+.preview-cover:empty {
+  margin-top: 0;
 }
 
 .preview-cover img {
@@ -731,7 +739,7 @@ body {
 }
 
 .preview-body {
-  margin-top: 16px;
+  margin-top: 20px;
   color: #42476f;
 }
 
