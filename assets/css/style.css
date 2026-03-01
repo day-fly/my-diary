@@ -103,6 +103,161 @@ body {
   animation: rise-in 0.8s ease both;
 }
 
+.home-latest {
+  margin-bottom: 20px;
+}
+
+.home-eyebrow {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.home-latest-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
+  padding: clamp(22px, 5vw, 40px);
+}
+
+.home-latest-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.home-latest-meta .post-card-date {
+  margin: 0;
+}
+
+.home-latest-title {
+  margin: 0;
+  font-size: clamp(1.7rem, 4.5vw, 2.5rem);
+  line-height: 1.25;
+  font-family: "Cormorant Garamond", serif;
+}
+
+.home-latest-excerpt {
+  margin: 12px 0 0;
+  color: #515982;
+}
+
+.home-latest-cover {
+  margin: 18px 0 0;
+}
+
+.home-latest-cover img {
+  width: 100%;
+  display: block;
+  border-radius: 16px;
+  object-fit: cover;
+  max-height: 380px;
+}
+
+.home-latest-card .btn-strong {
+  margin-top: 16px;
+}
+
+.home-flow {
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(83, 89, 137, 0.1);
+  padding: clamp(18px, 3.8vw, 24px);
+}
+
+.home-flow-head h2 {
+  margin: 0;
+  font-size: 1.38rem;
+  font-family: "Cormorant Garamond", serif;
+}
+
+.home-flow-head p {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.home-flow-viewer {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 50px 1fr 50px;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.home-flow-track {
+  min-height: 230px;
+}
+
+.home-flow-nav {
+  border: 1px solid #d7dcf2;
+  border-radius: 14px;
+  background: #f4f6ff;
+  color: #575d87;
+  font: inherit;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.home-flow-nav:hover {
+  border-color: #c9d0ef;
+  background: #ecefff;
+}
+
+.flow-post {
+  display: none;
+  height: 100%;
+  background: var(--paper);
+  border: 1px solid #dfe3f6;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.flow-post.is-active {
+  display: block;
+  animation: card-in 0.45s ease both;
+}
+
+.flow-post h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.flow-post p {
+  margin: 10px 0 0;
+  color: #5b638e;
+}
+
+.flow-post .btn-light {
+  margin-top: 14px;
+}
+
+.home-flow-progress {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.archive-head {
+  margin: 0 0 14px;
+}
+
+.archive-head h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 4.6vw, 2.35rem);
+  line-height: 1.25;
+  font-family: "Cormorant Garamond", serif;
+}
+
+.archive-head p {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+}
+
 .post-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -264,6 +419,36 @@ body {
   font-size: 0.9em;
 }
 
+.post-pager {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.post-pager-link {
+  display: grid;
+  gap: 3px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid #dce1f5;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f7f8ff;
+}
+
+.post-pager-link:hover {
+  border-color: #c8d0ef;
+  background: #f0f3ff;
+}
+
+.post-pager-label {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+
 .about {
   background: var(--paper);
   border-radius: var(--radius-lg);
@@ -412,6 +597,11 @@ body {
   font: inherit;
   font-size: 0.86rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  line-height: 1.2;
 }
 
 .btn-light {
@@ -569,10 +759,13 @@ body {
 @media (max-width: 700px) {
   .site-header {
     padding: 18px 14px 10px;
+    gap: 10px;
+    align-items: flex-start;
   }
 
   .site-nav {
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .site-nav a {
@@ -607,5 +800,18 @@ body {
 
   .post-card-image img {
     height: 162px;
+  }
+
+  .home-latest-card {
+    padding: 20px;
+  }
+
+  .home-flow-viewer {
+    grid-template-columns: 42px 1fr 42px;
+    gap: 8px;
+  }
+
+  .home-flow-track {
+    min-height: 255px;
   }
 }
