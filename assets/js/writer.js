@@ -311,6 +311,23 @@
     return text;
   }
 
+  function toMarkdownAssetUrl(value) {
+    var text = (value || "").trim();
+    if (!text) return "";
+    if (/^\{\{\s*['"][^'"]+['"]\s*\|\s*relative_url\s*\}\}$/.test(text)) return text;
+    if (text.startsWith("/assets/")) {
+      return "{{ '" + text + "' | relative_url }}";
+    }
+    return text;
+  }
+
+  function normalizeBodyAssetUrls(markdown) {
+    var text = String(markdown || "");
+    return text.replace(/(!?\[[^\]]*\]\()\/assets\/([^) \t]+)(\))/g, function (_match, open, pathPart, close) {
+      return open + toMarkdownAssetUrl("/assets/" + pathPart.replace(/^\/+/, "")) + close;
+    });
+  }
+
   function escapeHtml(text) {
     return String(text || "")
       .replace(/&/g, "&amp;")
@@ -323,6 +340,8 @@
   function extractMarkdownUrl(rawUrl) {
     var url = (rawUrl || "").trim();
     if (!url) return "";
+    var liquidRelativeMatch = url.match(/^\{\{\s*['"]([^'"]+)['"]\s*\|\s*relative_url\s*\}\}$/);
+    if (liquidRelativeMatch) return liquidRelativeMatch[1];
     if (url.startsWith("<") && url.endsWith(">")) url = url.slice(1, -1);
     if (/\s+/.test(url)) url = url.split(/\s+/)[0];
     return url;
@@ -844,7 +863,7 @@
       lines.push("## 사진 기록");
       lines.push("");
       payload.galleryUrls.forEach(function (url, index) {
-        lines.push("![사진 " + (index + 1) + "](" + url + ")");
+        lines.push("![사진 " + (index + 1) + "](" + toMarkdownAssetUrl(url) + ")");
         lines.push("");
       });
     }
@@ -1146,7 +1165,7 @@
       var i = 0;
       for (i = 0; i < imageFiles.length; i += 1) {
         var url = await uploadImage(info.owner, info.repo, info.branch, info.token, imageFiles[i], prefixBase, i);
-        inserted.push("![붙여넣은 이미지 " + (i + 1) + "](" + url + ")");
+        inserted.push("![붙여넣은 이미지 " + (i + 1) + "](" + toMarkdownAssetUrl(url) + ")");
       }
 
       var block = "\n" + inserted.join("\n\n") + "\n";
@@ -1168,7 +1187,7 @@
 
     var title = titleInput.value.trim();
     var category = categoryInput.value.trim() || "일기";
-    var body = bodyInput.value.trim();
+      var body = normalizeBodyAssetUrls(bodyInput.value.trim());
     var appendGallery = appendGalleryInput.checked;
     if (!title) {
       setStatus("제목은 필수입니다.", "status-error");

@@ -51,7 +51,7 @@ permalink: /write/
       </label>
       <p class="writer-tip">
         본문 입력창에서 <code>Ctrl/Cmd + V</code>로 이미지를 붙여넣으면
-        <code>assets/photos/</code>에 업로드되고 본문에 자동 삽입됩니다.
+        <code>assets/photos/</code>에 업로드되고, GitHub Pages 경로를 맞춰 본문에 자동 삽입됩니다.
       </p>
     </div>
 
