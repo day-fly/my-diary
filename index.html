@@ -4,6 +4,10 @@ title: "최신 글"
 ---
 {% if site.posts.size > 0 %}
   {% assign latest_post = site.posts.first %}
+  {% assign latest_excerpt = latest_post.excerpt | strip_html | strip %}
+  {% if latest_excerpt == "" %}
+    {% assign latest_excerpt = latest_post.content | strip_html | strip %}
+  {% endif %}
   <section class="home-latest">
     <p class="home-eyebrow">가장 최근 글</p>
     <article class="home-latest-card">
@@ -14,7 +18,7 @@ title: "최신 글"
         {% endif %}
       </div>
       <h1 class="home-latest-title">{{ latest_post.title }}</h1>
-      <p class="home-latest-excerpt">{{ latest_post.excerpt | strip_html | truncate: 220 }}</p>
+      <p class="home-latest-excerpt">{{ latest_excerpt | truncate: 220 }}</p>
       {% if latest_post.cover %}
         <figure class="home-latest-cover">
           <img src="{{ latest_post.cover | relative_url }}" alt="{{ latest_post.title }} 대표 이미지" />
@@ -35,6 +39,10 @@ title: "최신 글"
         <button class="home-flow-nav" type="button" data-flow-prev aria-label="이전 글 보기">‹</button>
         <div class="home-flow-track">
           {% for post in site.posts offset:1 %}
+            {% assign flow_excerpt = post.excerpt | strip_html | strip %}
+            {% if flow_excerpt == "" %}
+              {% assign flow_excerpt = post.content | strip_html | strip %}
+            {% endif %}
             <article class="flow-post{% if forloop.first %} is-active{% endif %}" data-flow-post>
               <div class="home-latest-meta">
                 <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
@@ -43,7 +51,7 @@ title: "최신 글"
                 {% endif %}
               </div>
               <h3>{{ post.title }}</h3>
-              <p>{{ post.excerpt | strip_html | truncate: 160 }}</p>
+              <p>{{ flow_excerpt | truncate: 160 }}</p>
               <a class="btn-light" href="{{ post.url | relative_url }}">이 글 읽기</a>
             </article>
           {% endfor %}
