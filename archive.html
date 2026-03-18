@@ -21,9 +21,6 @@ permalink: /archive/
           <div class="post-card-body">
             <div class="post-meta">
               <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
-              {% if post.category %}
-                <span class="category-chip">{{ post.category }}</span>
-              {% endif %}
             </div>
             {% assign card_excerpt = post.excerpt | strip_html | strip %}
             {% if card_excerpt == "" %}

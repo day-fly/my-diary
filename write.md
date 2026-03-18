@@ -14,18 +14,10 @@ permalink: /write/
       </div>
     </div>
 
-    <div class="writer-fields writer-fields-three">
+    <div class="writer-fields writer-fields-two">
       <label>
         제목
         <input id="post-title" type="text" placeholder="오늘의 기록 제목" autocomplete="off" />
-      </label>
-      <label>
-        카테고리
-        <select id="post-category">
-          <option value="시">시</option>
-          <option value="에세이">에세이</option>
-          <option value="일기" selected>일기</option>
-        </select>
       </label>
       <label>
         작성 시각
@@ -84,24 +76,9 @@ permalink: /write/
         <input id="current-post-path" type="text" readonly placeholder="_posts/YYYY-MM-DD-slug.md" />
       </label>
     </div>
-    <div class="writer-fields writer-fields-two">
-      <label>
-        변경 카테고리
-        <select id="manage-category">
-          <option value="시">시</option>
-          <option value="에세이">에세이</option>
-          <option value="일기" selected>일기</option>
-        </select>
-      </label>
-      <label>
-        빠른 변경 안내
-        <input type="text" value="선택한 글의 category만 변경합니다." readonly />
-      </label>
-    </div>
     <div class="writer-inline">
       <button id="load-posts" type="button" class="btn-light">목록 새로고침</button>
       <button id="load-selected-post" type="button" class="btn-light">선택 글 불러오기</button>
-      <button id="update-post-category" type="button" class="btn-light">카테고리만 변경</button>
     </div>
   </section>
 
@@ -161,7 +138,6 @@ permalink: /write/
     <h2>미리보기</h2>
     <article class="writer-preview">
       <p id="preview-date" class="preview-date"></p>
-      <p id="preview-category" class="preview-category"></p>
       <h3 id="preview-title">제목을 입력하세요</h3>
       <div id="preview-cover" class="preview-cover"></div>
       <div id="preview-body" class="preview-body post-content"></div>
