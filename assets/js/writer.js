@@ -41,6 +41,8 @@
   var postListSelect = document.getElementById("post-list");
   var loadPostsButton = document.getElementById("load-posts");
   var loadSelectedPostButton = document.getElementById("load-selected-post");
+  var updatePostCategoryButton = document.getElementById("update-post-category");
+  var manageCategorySelect = document.getElementById("manage-category");
   var currentPostPathInput = document.getElementById("current-post-path");
 
   var previewDate = document.getElementById("preview-date");
@@ -544,6 +546,42 @@
     return { data: data, body: body };
   }
 
+  function setMarkdownCategory(markdown, category) {
+    var match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+    if (!match) throw new Error("포스트 front matter 형식을 찾지 못했습니다.");
+
+    var frontMatterLines = match[1].split(/\r?\n/);
+    var categoryLine = 'category: "' + escapeYaml(category || "일기") + '"';
+    var replaced = false;
+    var i = 0;
+
+    for (i = 0; i < frontMatterLines.length; i += 1) {
+      if (/^\s*category:\s*/i.test(frontMatterLines[i])) {
+        frontMatterLines[i] = categoryLine;
+        replaced = true;
+        break;
+      }
+    }
+
+    if (!replaced) {
+      var dateIndex = -1;
+      for (i = 0; i < frontMatterLines.length; i += 1) {
+        if (/^\s*date:\s*/i.test(frontMatterLines[i])) {
+          dateIndex = i;
+          break;
+        }
+      }
+      if (dateIndex >= 0) {
+        frontMatterLines.splice(dateIndex, 0, categoryLine);
+      } else {
+        frontMatterLines.push(categoryLine);
+      }
+    }
+
+    var body = markdown.slice(match[0].length).replace(/^\n/, "");
+    return "---\n" + frontMatterLines.join("\n") + "\n---\n" + body;
+  }
+
   function setStatus(message, type, allowHtml) {
     statusElement.classList.remove("status-info", "status-error", "status-success");
     statusElement.classList.add(type || "status-info");
@@ -884,6 +922,7 @@
     currentPostPathInput.value = "";
     titleInput.value = "";
     categoryInput.value = "일기";
+    if (manageCategorySelect) manageCategorySelect.value = "일기";
     bodyInput.value = "";
     coverUrlInput.value = "";
     coverInput.value = "";
@@ -1085,6 +1124,7 @@
       var parsed = parseMarkdown(markdown);
       titleInput.value = parsed.data.title || "";
       categoryInput.value = parsed.data.category || "일기";
+      if (manageCategorySelect) manageCategorySelect.value = parsed.data.category || "일기";
       coverUrlInput.value = parsed.data.cover || "";
       bodyInput.value = parsed.body.replace(/^\n+/, "");
       currentPostPathInput.value = path;
@@ -1102,6 +1142,60 @@
     } finally {
       loadSelectedPostButton.disabled = false;
       loadSelectedPostButton.textContent = "선택 글 불러오기";
+    }
+  }
+
+  async function updateSelectedPostCategory() {
+    var info = ensureConnectionInfo();
+    if (!info) {
+      setStatus("카테고리 변경 전 Owner/Repo/Token(또는 OAuth 로그인)을 설정하세요.", "status-error");
+      return;
+    }
+
+    var path = currentPostPathInput.value.trim() || postListSelect.value;
+    if (!path) {
+      setStatus("카테고리를 바꿀 포스트를 먼저 선택하세요.", "status-error");
+      return;
+    }
+
+    var nextCategory = (manageCategorySelect ? manageCategorySelect.value : categoryInput.value).trim() || "일기";
+
+    try {
+      if (updatePostCategoryButton) {
+        updatePostCategoryButton.disabled = true;
+        updatePostCategoryButton.textContent = "변경 중...";
+      }
+      setStatus("카테고리 변경 중...", "status-info");
+
+      var meta = await getContentMeta(info.owner, info.repo, info.branch, path, info.token);
+      if (!meta || !meta.content) throw new Error("포스트 내용을 찾지 못했습니다.");
+
+      var markdown = base64ToUtf8(meta.content);
+      var updatedMarkdown = setMarkdownCategory(markdown, nextCategory);
+
+      await putContent({
+        owner: info.owner,
+        repo: info.repo,
+        branch: info.branch,
+        path: path,
+        token: info.token,
+        contentBase64: utf8ToBase64(updatedMarkdown),
+        message: "Update post category: " + path + " -> " + nextCategory,
+      });
+
+      categoryInput.value = nextCategory;
+      if (manageCategorySelect) manageCategorySelect.value = nextCategory;
+      currentPostPathInput.value = path;
+      await loadPostList();
+      updatePreview();
+      setStatus("카테고리를 '" + nextCategory + "'로 변경했습니다: " + path, "status-success");
+    } catch (error) {
+      setStatus("카테고리 변경 실패: " + error.message, "status-error");
+    } finally {
+      if (updatePostCategoryButton) {
+        updatePostCategoryButton.disabled = false;
+        updatePostCategoryButton.textContent = "카테고리만 변경";
+      }
     }
   }
 
@@ -1187,7 +1281,7 @@
 
     var title = titleInput.value.trim();
     var category = categoryInput.value.trim() || "일기";
-      var body = normalizeBodyAssetUrls(bodyInput.value.trim());
+    var body = normalizeBodyAssetUrls(bodyInput.value.trim());
     var appendGallery = appendGalleryInput.checked;
     if (!title) {
       setStatus("제목은 필수입니다.", "status-error");
@@ -1301,6 +1395,18 @@
 
   if (loadPostsButton) loadPostsButton.addEventListener("click", loadPostList);
   if (loadSelectedPostButton) loadSelectedPostButton.addEventListener("click", loadSelectedPost);
+  if (updatePostCategoryButton) updatePostCategoryButton.addEventListener("click", updateSelectedPostCategory);
+  if (manageCategorySelect) {
+    manageCategorySelect.addEventListener("change", function () {
+      categoryInput.value = manageCategorySelect.value;
+      updatePreview();
+    });
+  }
+  if (categoryInput && manageCategorySelect) {
+    categoryInput.addEventListener("change", function () {
+      manageCategorySelect.value = categoryInput.value;
+    });
+  }
   if (newDraftButton) newDraftButton.addEventListener("click", resetDraftMode);
   if (deleteButton) deleteButton.addEventListener("click", deleteCurrentPost);
   if (bodyInput) bodyInput.addEventListener("paste", handleBodyPaste);
