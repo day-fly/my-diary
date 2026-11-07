@@ -1,37 +1,47 @@
 ---
 layout: default
-title: "글 목록"
 ---
-<section class="archive-head">
-  <h1>글 목록</h1>
-  <p>작성한 글을 시간순으로 모아봅니다.</p>
-</section>
 
-<section class="post-list">
-  {% if site.posts.size > 0 %}
-    {% for post in site.posts %}
-      <article class="post-card">
-        <a href="{{ post.url | relative_url }}" class="post-card-link">
-          {% if post.cover %}
-            <div class="post-card-image">
-              <img src="{{ post.cover | relative_url }}" alt="{{ post.title }} 썸네일" />
-            </div>
-          {% endif %}
-          <div class="post-card-body">
-            <div class="post-meta">
-              <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
-            </div>
-            {% assign card_excerpt = post.excerpt | strip_html | strip %}
-            {% if card_excerpt == "" %}
-              {% assign card_excerpt = post.content | strip_html | strip %}
-            {% endif %}
-            <h2>{{ post.title }}</h2>
-            <p class="post-card-excerpt">{{ card_excerpt | truncate: 120 }}</p>
-          </div>
-        </a>
-      </article>
-    {% endfor %}
-  {% else %}
-    <p class="empty-state">아직 작성된 글이 없어요. 첫 문장을 남겨보세요.</p>
-  {% endif %}
+<section class="home-intro">
+  <p class="eyebrow">A PERSONAL JOURNAL</p>
+  <h1>흘러가는 날들,<br />남겨두고 싶은 문장.</h1>
+  <p>시와 에세이, 그리고 일상의 작은 마음들을 모읍니다.</p>
+  <span class="intro-note" aria-hidden="true">마음이 머무는 곳에, 기록을.</span>
 </section>
+<div class="home-feature">
+  {% assign latest = site.posts.first %} {% if latest %}
+  {% assign latest_excerpt = latest.excerpt | strip_html | strip %}
+  {% if latest_excerpt == '' %}{% assign latest_excerpt = latest.content | strip_html | strip %}{% endif %}
+  <section class="latest-entry" aria-labelledby="latest-title">
+    <div class="section-kicker">
+      <span class="status-dot" aria-hidden="true"></span> 가장 최근의 기록
+      <time datetime="{{ latest.date | date_to_xmlschema }}"
+        >{{ latest.date | date: '%Y.%m.%d' }}</time
+      >
+    </div>
+    <a href="{{ latest.url | relative_url }}"
+      ><h2 id="latest-title">{{ latest.title | escape }}</h2>
+      <p>
+        {{ latest_excerpt | normalize_whitespace | truncate: 180 }}
+      </p>
+      <span class="read-link"
+        >이어서 읽기 <span aria-hidden="true">↗</span></span
+      ></a
+    >
+  </section>
+  {% endif %}
+  <aside class="profile-card">
+    <p class="eyebrow">이 공간을 기록하는 사람</p>
+    <a class="profile-identity" href="{{ '/about/' | relative_url }}"
+      >{% include avatar.html %}<span
+        ><strong>{{ site.data.profile.name | escape }}</strong
+        ><span
+          >{{ site.data.profile.tagline | default: '마음의 가장자리에 문장을 남깁니다.' | escape }}</span
+        ></span
+      ></a
+    ><a class="text-link" href="{{ '/about/' | relative_url }}"
+      >조금 더 알아보기 <span aria-hidden="true">↗</span></a
+    >
+  </aside>
+</div>
+{% include post-list.html %}

@@ -21,3 +21,14 @@ defaults:
     values:
       layout: "post"
       author: "me"
+
+exclude:
+  - node_modules
+  - tests
+  - package.json
+  - package-lock.json
+  - README.md
+  - scripts
+  - oauth-proxy
+  - Gemfile
+  - Gemfile.lock

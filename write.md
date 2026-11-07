@@ -1,149 +1,37 @@
 ---
 layout: default
-title: Write
+title: "글쓰기"
 permalink: /write/
 ---
-<section class="writer-page">
-  <section class="writer-panel writer-main-panel">
-    <div class="writer-main-head">
-      <h2>포스트 작성</h2>
-      <div class="writer-main-actions">
-        <button id="new-draft" type="button" class="btn-light">새 글 모드</button>
-        <button id="publish-post" type="button" class="btn-strong">Publish To GitHub</button>
-        <button id="delete-post" type="button" class="btn-danger">현재 글 삭제</button>
-      </div>
-    </div>
 
-    <div class="writer-fields writer-fields-two">
-      <label>
-        제목
-        <input id="post-title" type="text" placeholder="오늘의 기록 제목" autocomplete="off" />
-      </label>
-      <label>
-        작성 시각
-        <input id="post-date" type="datetime-local" />
-      </label>
-    </div>
-
-    <div class="writer-fields writer-fields-two">
-      <label>
-        표지 사진 업로드
-        <input id="cover-image" type="file" accept="image/*" />
-      </label>
-      <label>
-        표지 URL (기존 글 수정용)
-        <input id="cover-url" type="text" placeholder="/assets/photos/..." autocomplete="off" />
-      </label>
-    </div>
-
-    <div class="writer-fields">
-      <label>
-        본문 내용 (Markdown)
-        <textarea id="post-body" rows="18" placeholder="오늘 하루를 자유롭게 작성해보세요."></textarea>
-      </label>
-      <p class="writer-tip">
-        본문 입력창에서 <code>Ctrl/Cmd + V</code>로 이미지를 붙여넣으면
-        <code>assets/photos/</code>에 업로드되고, GitHub Pages 경로를 맞춰 본문에 자동 삽입됩니다.
-      </p>
-    </div>
-
-    <div class="writer-fields writer-fields-two">
-      <label>
-        본문 사진들 (선택)
-        <input id="gallery-images" type="file" accept="image/*" multiple />
-      </label>
-      <label class="writer-check writer-check-box">
-        <input id="append-gallery" type="checkbox" checked />
-        본문 끝에 업로드한 사진 자동 추가
-      </label>
-    </div>
-
-    <p id="writer-status" class="writer-status" aria-live="polite"></p>
-  </section>
-
-  <section class="writer-panel writer-manage-panel">
-    <h2>기존 포스트 관리</h2>
-    <p class="writer-help">목록에서 선택 후 불러오면 수정 모드로 전환됩니다.</p>
-    <div class="writer-fields writer-fields-two">
-      <label>
-        포스트 목록
-        <select id="post-list">
-          <option value="">먼저 목록 새로고침</option>
-        </select>
-      </label>
-      <label>
-        현재 편집 파일
-        <input id="current-post-path" type="text" readonly placeholder="_posts/YYYY-MM-DD-slug.md" />
-      </label>
-    </div>
-    <div class="writer-inline">
-      <button id="load-posts" type="button" class="btn-light">목록 새로고침</button>
-      <button id="load-selected-post" type="button" class="btn-light">선택 글 불러오기</button>
-    </div>
-  </section>
-
-  <details class="writer-panel writer-connection-panel">
-    <summary>GitHub 연결 설정 (OAuth / PAT)</summary>
-    <p class="writer-help writer-help-top">
-      작성 화면이 좁아지지 않도록 기본은 접혀 있습니다.
-    </p>
-    <div class="writer-fields writer-fields-two">
-      <label>
-        OAuth Client ID
-        <input id="oauth-client-id" type="text" placeholder="Ov23..." autocomplete="off" />
-      </label>
-      <label>
-        OAuth Proxy URL
-        <input id="oauth-proxy-url" type="url" placeholder="https://your-worker.workers.dev" autocomplete="off" />
-      </label>
-    </div>
-    <div class="writer-inline">
-      <button id="oauth-login" type="button" class="btn-strong">GitHub로 로그인</button>
-      <button id="oauth-logout" type="button" class="btn-light">OAuth 로그아웃</button>
-    </div>
-    <p id="oauth-status" class="writer-status status-info" aria-live="polite">OAuth 미연결 상태</p>
-
-    <div class="writer-fields writer-fields-three">
-      <label>
-        Owner
-        <input id="gh-owner" type="text" placeholder="day-fly" autocomplete="off" />
-      </label>
-      <label>
-        Repo
-        <input id="gh-repo" type="text" placeholder="my-diary" autocomplete="off" />
-      </label>
-      <label>
-        Branch
-        <input id="gh-branch" type="text" value="main" autocomplete="off" />
-      </label>
-    </div>
-
-    <div class="writer-fields writer-fields-two">
-      <label>
-        Token (자동/수동)
-        <input id="gh-token" type="password" placeholder="OAuth 연결 시 자동 입력" autocomplete="off" />
-      </label>
-      <label class="writer-check writer-check-box">
-        <input id="remember-token" type="checkbox" />
-        토큰도 브라우저에 저장
-      </label>
-    </div>
-
-    <div class="writer-inline">
-      <button id="save-config" type="button" class="btn-light">연결 정보 저장</button>
-    </div>
+<div class="writer-page" data-owner="day-fly" data-repo="my-diary" data-branch="main">
+  <header class="writer-heading"><div><p class="eyebrow">YOUR WRITING ROOM</p><h1>한 편의 기록</h1></div><a class="text-link" href="{{ '/' | relative_url }}">기록으로 돌아가기 ↗</a></header>
+  <div class="writer-actionbar"><div><span id="draft-status" role="status">이 브라우저에 자동 임시저장</span><span id="word-count" class="muted">0자</span></div><div class="writer-main-actions"><button id="new-draft" type="button" class="btn-light">새 글</button><button id="save-draft" type="button" class="btn-light">임시저장</button><button id="publish-post" type="button" class="btn-strong">발행하기 <span aria-hidden="true">↗</span></button></div></div>
+  <p id="writer-status" class="writer-status" role="status" aria-live="polite"></p>
+  <details class="writer-panel writer-connection-panel" id="connection">
+    <summary><span>발행 계정 연결</span><span class="summary-note" id="connection-state">로그인 후 발행할 수 있어요</span></summary>
+    <p class="writer-help">글은 로그인 전에도 쓸 수 있어요. 처음 한 번 연결하면 이 브라우저에서 설정을 기억합니다.</p>
+    <div class="writer-fields writer-fields-two"><label>OAuth Client ID<input id="oauth-client-id" type="text" placeholder="GitHub OAuth App의 Client ID" autocomplete="off" /></label><label>OAuth Proxy URL<input id="oauth-proxy-url" type="url" placeholder="https://your-worker.workers.dev" autocomplete="off" /></label></div>
+    <div class="writer-inline"><button id="oauth-login" type="button" class="btn-strong">GitHub로 로그인</button><button id="oauth-logout" type="button" class="btn-light">로그아웃</button></div>
+    <p id="oauth-status" class="writer-status" aria-live="polite">발행 계정을 연결해 주세요.</p>
+    <details class="advanced-settings"><summary>고급 연결 설정 / 토큰으로 연결</summary>
+      <div class="writer-fields writer-fields-three"><label>저장소 소유자<input id="gh-owner" type="text" autocomplete="off" /></label><label>저장소 이름<input id="gh-repo" type="text" autocomplete="off" /></label><label>브랜치<input id="gh-branch" type="text" value="main" autocomplete="off" /></label></div>
+      <div class="writer-fields"><label>GitHub 토큰<input id="gh-token" type="password" placeholder="Contents 읽기·쓰기 권한이 있는 토큰" autocomplete="off" /></label><label class="writer-check"><input id="remember-token" type="checkbox" /> 이 기기에 로그인 정보 기억하기 (개인 기기에서만)</label></div>
+    </details>
+    <button id="save-config" type="button" class="btn-light">연결 정보 저장</button>
   </details>
-
-  <section class="writer-panel writer-preview-panel">
-    <h2>미리보기</h2>
-    <article class="writer-preview">
-      <p id="preview-date" class="preview-date"></p>
-      <h3 id="preview-title">제목을 입력하세요</h3>
-      <div id="preview-cover" class="preview-cover"></div>
-      <div id="preview-body" class="preview-body post-content"></div>
-      <div id="preview-gallery" class="preview-gallery"></div>
-    </article>
+  <section class="writer-panel writing-sheet">
+    <div class="editor-tabs" role="group" aria-label="편집 화면"><button id="show-editor" type="button" aria-pressed="true" aria-controls="editor-pane">작성</button><button id="show-preview" type="button" aria-pressed="false" aria-controls="preview-pane">미리보기</button></div>
+    <div id="editor-pane">
+      <label class="title-field"><span class="sr-only">글 제목</span><input id="post-title" type="text" placeholder="어떤 제목을 붙여볼까요?" autocomplete="off" maxlength="200" /></label>
+      <div class="editor-meta writer-fields writer-fields-two"><label>글 종류<select id="post-category"><option value="">기록</option><option>시</option><option>에세이</option><option>일기</option></select></label><label>기록 날짜<input id="post-date" type="datetime-local" /></label></div>
+      <div class="format-toolbar" role="group" aria-label="본문 서식"><button type="button" data-format="bold" aria-label="굵게"><strong>B</strong></button><button type="button" data-format="heading" aria-label="소제목">H</button><button type="button" data-format="quote" aria-label="인용문">❝</button><button type="button" data-format="list" aria-label="목록">☷</button><button type="button" data-format="link" aria-label="링크 삽입">링크</button><span>문장에 마음을 담아보세요</span></div>
+      <label class="body-field"><span class="sr-only">본문</span><textarea id="post-body" rows="16" placeholder="완벽한 문장이 아니어도 괜찮아요.&#10;오늘 마음에 남은 것부터 천천히 적어보세요."></textarea></label>
+    </div>
+    <article id="preview-pane" class="writer-preview" hidden><p id="preview-date" class="post-date"></p><h2 id="preview-title">제목을 입력하세요</h2><div id="preview-cover" class="preview-cover"></div><div id="preview-body" class="preview-body post-content"></div><div id="preview-gallery" class="preview-gallery"></div></article>
+    <details class="attachment-options"><summary>사진 추가 <span class="summary-note">표지 · 본문 사진</span></summary><div class="writer-fields writer-fields-two"><label>표지 사진<input id="cover-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /><span class="writer-tip">사진 한 장당 10MB 이하</span></label><label>기존 표지 주소<input id="cover-url" type="text" placeholder="사진 주소 (선택)" autocomplete="off" /></label><label>본문 사진<input id="gallery-images" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple /></label><label class="writer-check"><input id="append-gallery" type="checkbox" checked /> 본문 끝에 사진 추가</label></div><p class="writer-tip">선택한 사진은 발행할 때 업로드됩니다. 사진 파일은 임시저장되지 않으니 다시 열 때 선택해 주세요. 로그인 후 본문에 사진을 붙여넣으면 즉시 업로드됩니다.</p></details>
   </section>
-</section>
-
+  <details class="writer-panel writer-manage-panel" id="manage"><summary>기존 글 수정 <span class="summary-note">발행한 기록 불러오기</span></summary><p class="writer-help">글을 불러와 수정한 뒤 ‘수정 발행’을 누르세요.</p><div class="writer-fields"><label>발행한 글<select id="post-list"><option value="">목록 새로고침을 눌러주세요</option></select></label><input id="current-post-path" type="hidden" /></div><div class="writer-inline"><button id="load-posts" type="button" class="btn-light">목록 새로고침</button><button id="load-selected-post" type="button" class="btn-light">선택 글 불러오기</button><button id="delete-post" type="button" class="btn-danger" disabled>현재 글 삭제</button></div></details>
+  <details class="writer-panel" id="profile"><summary>내 프로필 <span class="summary-note">사진 · 이름 · 소개</span></summary><p class="writer-help">저장하면 홈과 소개 페이지에 공개됩니다.</p><div class="profile-editor-preview"><span id="profile-avatar-preview" class="profile-avatar"></span><div><strong id="profile-name-preview"></strong><p id="profile-tagline-preview" class="muted"></p></div></div><div class="writer-fields writer-fields-two"><label>표시 이름<input id="profile-name" type="text" maxlength="60" value="{{ site.data.profile.name | escape }}" /></label><label>한 줄 소개<input id="profile-tagline" type="text" maxlength="120" value="{{ site.data.profile.tagline | escape }}" placeholder="나를 소개하는 짧은 한 문장" /></label></div><div class="writer-fields"><label>자기소개<textarea id="profile-bio" rows="5" maxlength="3000" placeholder="어떤 마음으로 글을 쓰고 있나요?">{{ site.data.profile.bio | escape }}</textarea></label></div><div class="writer-fields writer-fields-two"><label>프로필 사진<input id="profile-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /></label><label>웹사이트<input id="profile-website" type="url" value="{{ site.data.profile.website | escape }}" placeholder="https://" /></label></div><input id="profile-avatar" type="hidden" value="{{ site.data.profile.avatar | escape }}" /><div class="writer-inline"><button id="remove-profile-photo" class="btn-light" type="button">사진 지우기</button><button id="load-profile" class="btn-light" type="button">저장된 프로필 불러오기</button><button id="save-profile" class="btn-strong" type="button">프로필 저장</button></div><p id="profile-status" class="writer-status" role="status"></p></details>
+</div>
 <script src="{{ '/assets/js/writer.js' | relative_url }}" defer></script>

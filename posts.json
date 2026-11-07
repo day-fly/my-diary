@@ -1,0 +1,5 @@
+---
+layout: null
+permalink: /posts.json
+---
+[{% for post in site.posts %}{"title":{{ post.title | jsonify }},"date":{{ post.date | date: '%Y.%m.%d' | jsonify }},"path":{{ post.path | jsonify }}}{% unless forloop.last %},{% endunless %}{% endfor %}]

@@ -1,38 +1,12 @@
 ---
 layout: default
-title: "글 목록"
+title: "기록 보관함"
 permalink: /archive/
 ---
-<section class="archive-head">
-  <h1>글 목록</h1>
-  <p>작성한 글을 시간순으로 모아봅니다.</p>
-</section>
 
-<section class="post-list">
-  {% if site.posts.size > 0 %}
-    {% for post in site.posts %}
-      <article class="post-card">
-        <a href="{{ post.url | relative_url }}" class="post-card-link">
-          {% if post.cover %}
-            <div class="post-card-image">
-              <img src="{{ post.cover | relative_url }}" alt="{{ post.title }} 썸네일" />
-            </div>
-          {% endif %}
-          <div class="post-card-body">
-            <div class="post-meta">
-              <p class="post-card-date">{{ post.date | date: "%Y.%m.%d" }}</p>
-            </div>
-            {% assign card_excerpt = post.excerpt | strip_html | strip %}
-            {% if card_excerpt == "" %}
-              {% assign card_excerpt = post.content | strip_html | strip %}
-            {% endif %}
-            <h2>{{ post.title }}</h2>
-            <p class="post-card-excerpt">{{ card_excerpt | truncate: 120 }}</p>
-          </div>
-        </a>
-      </article>
-    {% endfor %}
-  {% else %}
-    <p class="empty-state">아직 작성된 글이 없어요. 첫 문장을 남겨보세요.</p>
-  {% endif %}
-</section>
+<header class="page-heading">
+  <p class="eyebrow">THE ARCHIVE</p>
+  <h1>기록 보관함</h1>
+  <p>한 문장씩 쌓아온 시간들.</p>
+</header>
+{% include post-list.html %}
