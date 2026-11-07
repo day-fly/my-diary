@@ -248,7 +248,7 @@ h1 {
   font-size: 27px;
   margin: 0 0 13px;
 }
-.latest-entry a > p {
+.latest-entry-text > p {
   font-family: var(--serif);
   font-size: 15px;
   line-height: 2;
