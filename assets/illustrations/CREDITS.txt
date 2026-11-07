@@ -1,0 +1,6 @@
+Original illustrations generated for 마음의 가장자리 on 2026-11-07.
+Created with the built-in OpenAI image generation tool from the author's existing posts.
+Medium: watercolor and graphite on warm paper. These are interpretive illustrations, not documentary photographs.
+Each full-size JPG has a corresponding 480px responsive copy. Both show the same illustration.
+Post associations and Korean image descriptions: _data/illustrations.json.
+Existing photographs and the author's prose are unchanged.

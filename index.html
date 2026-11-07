@@ -23,7 +23,8 @@ layout: default
       >
     </div>
     <a class="latest-entry-link{% if resolved_cover != '' %} has-cover{% endif %}" href="{{ latest.url | relative_url }}">
-      {% if resolved_cover != '' %}<img class="latest-cover" src="{{ resolved_cover | escape }}" width="240" height="180" alt="" decoding="async" />{% endif %}
+      {% assign latest_illustration = site.data.illustrations[latest.cover] %}
+      {% if resolved_cover != '' %}<img class="latest-cover" src="{{ resolved_cover | escape }}" {% if latest_illustration %}srcset="{{ latest_illustration.thumbnail | relative_url }} 480w, {{ resolved_cover | escape }} 1200w" sizes="(max-width: 760px) calc(100vw - 88px), 160px"{% endif %} width="240" height="180" alt="" decoding="async" />{% endif %}
       <div class="latest-entry-text"><h2 id="latest-title">{{ latest.title | escape }}</h2>
       <p>
         {{ latest_excerpt | normalize_whitespace | truncate: 180 }}

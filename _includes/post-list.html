@@ -50,9 +50,11 @@
             >읽어보기 <span aria-hidden="true">↗</span></span
           >
         </div>
+        {% assign card_illustration = site.data.illustrations[post.cover] %}
         {% if resolved_cover != '' %}<img
           class="post-card-image"
           src="{{ resolved_cover | escape }}"
+          {% if card_illustration %}srcset="{{ card_illustration.thumbnail | relative_url }} 480w, {{ resolved_cover | escape }} 1200w" sizes="(max-width: 380px) 88px, (max-width: 760px) 104px, 120px"{% endif %}
           alt=""
           loading="lazy"
           width="160"

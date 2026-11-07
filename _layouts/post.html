@@ -17,11 +17,17 @@ layout: default
     >
   </header>
   {% if page.cover %}
+  {% assign cover_illustration = site.data.illustrations[page.cover] %}
   <figure class="post-cover">
     <img
       src="{{ page.cover | relative_url }}"
-      alt="{{ page.title | escape }} 대표 이미지"
+      alt="{% if cover_illustration %}{{ cover_illustration.alt | escape }}{% else %}{{ page.title | escape }} 대표 이미지{% endif %}"
+      {% if cover_illustration %}width="{{ cover_illustration.width }}" height="{{ cover_illustration.height }}"
+      srcset="{{ cover_illustration.thumbnail | relative_url }} 480w, {{ page.cover | relative_url }} 1200w"
+      sizes="(max-width: 760px) calc(100vw - 40px), 760px"{% endif %}
+      decoding="async"
     />
+    {% if cover_illustration %}<figcaption class="illustration-caption">글의 분위기를 담은 AI 삽화</figcaption>{% endif %}
   </figure>
   {% endif %}
   <div class="post-content">{{ content }}</div>
