@@ -51,16 +51,16 @@
           >
         </div>
         {% assign card_illustration = site.data.illustrations[post.cover] %}
-        {% if resolved_cover != '' %}<img
+        {% if resolved_cover != '' %}<span class="post-card-media"><img
           class="post-card-image"
           src="{{ resolved_cover | escape }}"
-          {% if card_illustration %}srcset="{{ card_illustration.thumbnail | relative_url }} 480w, {{ resolved_cover | escape }} 1200w" sizes="(max-width: 380px) 88px, (max-width: 760px) 104px, 120px"{% endif %}
+          {% if card_illustration %}srcset="{{ card_illustration.thumbnail | relative_url }} 480w, {{ resolved_cover | escape }} 1200w" sizes="(max-width: 380px) calc(40vw - 12.8px), (max-width: 760px) min(200px, calc(40vw - 16px)), min(200px, calc(20vw - 19.6px))"{% endif %}
           alt=""
           loading="lazy"
           width="160"
           height="120"
           decoding="async"
-        />{% endif %}
+        /></span>{% endif %}
       </a>
     </article>
     {% endfor %}

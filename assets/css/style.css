@@ -422,10 +422,10 @@ h1 {
 }
 .post-card-link {
   display: flex;
-  gap: 20px;
-  align-items: center;
+  gap: 18px;
+  align-items: stretch;
   height: 100%;
-  padding: 27px 0;
+  padding: 20px 0;
 }
 .post-card-body {
   min-width: 0;
@@ -460,12 +460,22 @@ h1 {
 .post-card .read-link {
   font-size: 10px;
 }
-.post-card-image {
-  width: 98px;
-  height: 116px;
-  object-fit: cover;
-  flex-shrink: 0;
+.post-card-media {
+  position: relative;
+  flex: 0 0 40%;
+  max-width: 200px;
+  min-height: 160px;
+  overflow: hidden;
   border-radius: 3px;
+  background: var(--accent-soft);
+}
+.post-card-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 .post-card-link:hover h3 {
   text-decoration: underline;
@@ -1105,8 +1115,11 @@ h1 {
     grid-template-columns: 1fr;
   }
   .post-card-link {
-    padding: 24px 0;
-    gap: 18px;
+    padding: 18px 0;
+    gap: 14px;
+  }
+  .post-card-media {
+    min-height: 148px;
   }
   .post-card h3 {
     font-size: 20px;
@@ -1355,10 +1368,6 @@ h1 {
   .result-count {
     display: none;
   }
-  .post-card-image {
-    width: 78px;
-    height: 100px;
-  }
   .writer-heading > .text-link {
     display: none;
   }
@@ -1375,15 +1384,7 @@ h1 {
   }
 }
 
-/* Cover thumbnails preserve the source image and crop only the list view. */
-.post-card-image {
-  width: 120px;
-  height: 90px;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  object-position: center;
-  background: var(--accent-soft);
-}
+/* Latest-entry covers preserve the source image and crop only the preview. */
 .latest-entry-link.has-cover {
   display: flex;
   align-items: center;
@@ -1446,10 +1447,6 @@ h1 {
   color: var(--ink-soft);
 }
 @media (max-width: 760px) {
-  .post-card-image {
-    width: 104px;
-    height: 78px;
-  }
   .latest-entry-link.has-cover {
     flex-direction: column;
     align-items: stretch;
@@ -1467,12 +1464,6 @@ h1 {
   .cover-choice-preview img {
     width: 160px;
     height: 120px;
-  }
-}
-@media (max-width: 380px) {
-  .post-card-image {
-    width: 88px;
-    height: 66px;
   }
 }
 
