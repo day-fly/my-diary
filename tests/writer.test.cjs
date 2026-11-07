@@ -101,6 +101,7 @@ function setup({
   Object.entries(profile).forEach(([field, value]) => {
     d.getElementById("profile-" + field).value = value;
   });
+  w.eval(readFileSync("assets/js/cover-image.js", "utf8"));
   w.eval(script);
   function input(id, value) {
     d.getElementById(id).value = value;
@@ -372,4 +373,139 @@ test("profile photo uploads before the profile record and oversized photos are r
   assert.equal(a.writes.length, 2);
   assert.match(a.d.getElementById("profile-status").textContent, /10MB/);
   a.w.close();
+});
+
+test("automatic cover preview uses the first body image, explicit cover wins, and opt-out survives reload", async () => {
+  const a = setup();
+  await flush();
+  a.input(
+    "post-body",
+    '사진 기록\n![첫 사진]({{ "/assets/photos/first.jpg" | relative_url }})\n![두 번째](/assets/photos/second.jpg)',
+  );
+  const image = a.d.getElementById("cover-card-preview");
+  assert.equal(image.getAttribute("src"), "/my-diary/assets/photos/first.jpg");
+  a.input("cover-url", "/assets/photos/custom.jpg");
+  assert.equal(image.getAttribute("src"), "/my-diary/assets/photos/custom.jpg");
+  a.d.getElementById("clear-cover").click();
+  assert.equal(image.hidden, true);
+  assert.equal(a.d.getElementById("auto-cover").checked, false);
+  const b = setup({ draft: JSON.parse(a.w.localStorage.getItem(a.key)) });
+  await flush();
+  assert.equal(b.d.getElementById("cover-card-preview").hidden, true);
+  assert.equal(b.d.getElementById("auto-cover").checked, false);
+  a.w.close();
+  b.w.close();
+});
+
+test("cover opt-out is retained on existing posts and saved as front matter", async () => {
+  const a = setup({
+    post: oldPost.replace(
+      'category: "시"',
+      'category: "시"\ncover_auto: false',
+    ),
+  });
+  await flush();
+  a.input("gh-token", "test-only-token");
+  a.d.getElementById("post-list").value = postPath;
+  a.d.getElementById("load-selected-post").click();
+  await flush();
+  assert.equal(a.d.getElementById("auto-cover").checked, false);
+  a.input("post-body", "수정한 기록");
+  a.d.getElementById("publish-post").click();
+  await flush();
+  const markdown = Buffer.from(
+    a.writes[0].payload.content,
+    "base64",
+  ).toString();
+  assert.equal((markdown.match(/cover_auto: false/g) || []).length, 1);
+  a.w.close();
+});
+
+test("cover sizing preserves landscape and portrait ratios and never enlarges small images", async () => {
+  const a = setup();
+  await flush();
+  const size = a.w.DiaryCoverImage.dimensions;
+  assert.deepEqual(JSON.parse(JSON.stringify(size(4032, 3024))), {
+    width: 1600,
+    height: 1200,
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(size(3000, 4000))), {
+    width: 1200,
+    height: 1600,
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(size(640, 480))), {
+    width: 640,
+    height: 480,
+  });
+  assert.throws(() => size(0, 100), /크기/);
+  a.w.close();
+});
+
+test("cover publication uploads the optimized file and keeps the body photograph unchanged", async () => {
+  const a = setup();
+  await flush();
+  a.input("gh-token", "test-only-token");
+  a.input("post-title", "사진이 있는 기록");
+  a.input("post-body", "![본문 사진](/assets/photos/original.png)");
+  a.input("post-date", "2026-01-01T12:00");
+  const original = new a.w.File(["original"], "photo.png", {
+    type: "image/png",
+  });
+  const optimized = new a.w.File(["jpeg"], "photo-cover.jpg", {
+    type: "image/jpeg",
+  });
+  optimized.arrayBuffer = async () => new Uint8Array([10, 20, 30]).buffer;
+  let files = [original];
+  const picker = a.d.getElementById("cover-image");
+  Object.defineProperty(picker, "files", { get: () => files });
+  Object.defineProperty(picker, "value", {
+    get: () => (files.length ? "photo.png" : ""),
+    set: (value) => {
+      if (!value) files = [];
+    },
+  });
+  let selected;
+  a.w.DiaryCoverImage.prepare = async (file) => {
+    selected = file;
+    return { file: optimized, width: 1600, height: 1200 };
+  };
+  a.d.getElementById("publish-post").click();
+  await flush();
+  assert.equal(selected, original);
+  assert.equal(a.writes.length, 2);
+  assert.match(a.writes[0].url, /photo-cover\.jpg$/);
+  const markdown = Buffer.from(
+    a.writes[1].payload.content,
+    "base64",
+  ).toString();
+  assert.match(markdown, /cover: "\/assets\/photos\/.+photo-cover\.jpg"/);
+  assert.match(markdown, /original\.png/);
+  assert.equal(picker.files.length, 0);
+  a.w.close();
+});
+
+test("built archive uses each existing photo without duplicating the GitHub Pages base path", () => {
+  const home = new JSDOM(readFileSync("_site/index.html", "utf8"));
+  const cards = Array.from(home.window.document.querySelectorAll(".post-card"));
+  for (const card of cards) {
+    const link = card.querySelector("a").getAttribute("href");
+    const post = new JSDOM(
+      readFileSync(
+        "_site/" + decodeURI(link.replace("/my-diary/", "")) + "index.html",
+        "utf8",
+      ),
+    );
+    const source =
+      post.window.document.querySelector(".post-cover img") ||
+      post.window.document.querySelector(".post-content img");
+    const thumbnail = card.querySelector(".post-card-image");
+    if (thumbnail) {
+      assert.ok(source);
+      assert.equal(thumbnail.getAttribute("src"), source.getAttribute("src"));
+      assert.equal(thumbnail.getAttribute("loading"), "lazy");
+      assert.ok(!thumbnail.getAttribute("src").includes("/my-diary/my-diary/"));
+    }
+    post.window.close();
+  }
+  home.window.close();
 });

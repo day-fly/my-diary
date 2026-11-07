@@ -2,16 +2,19 @@
 layout: default
 ---
 
+{% include season-setup.html %}
 <section class="home-intro">
-  <p class="eyebrow">A PERSONAL JOURNAL</p>
+  <p class="eyebrow">A PERSONAL JOURNAL <span class="season-label" data-season-name>{{ season_name }}의 기록</span></p>
+  {% include season-art.html %}
   <h1>흘러가는 날들,<br />남겨두고 싶은 문장.</h1>
   <p>시와 에세이, 그리고 일상의 작은 마음들을 모읍니다.</p>
-  <span class="intro-note" aria-hidden="true">마음이 머무는 곳에, 기록을.</span>
+  <span class="intro-note" data-season-note aria-hidden="true">마음이 머무는 곳에, 기록을.</span>
 </section>
 <div class="home-feature">
   {% assign latest = site.posts.first %} {% if latest %}
   {% assign latest_excerpt = latest.excerpt | strip_html | strip %}
   {% if latest_excerpt == '' %}{% assign latest_excerpt = latest.content | strip_html | strip %}{% endif %}
+  {% include post-cover.html post=latest %}
   <section class="latest-entry" aria-labelledby="latest-title">
     <div class="section-kicker">
       <span class="status-dot" aria-hidden="true"></span> 가장 최근의 기록
@@ -19,14 +22,15 @@ layout: default
         >{{ latest.date | date: '%Y.%m.%d' }}</time
       >
     </div>
-    <a href="{{ latest.url | relative_url }}"
-      ><h2 id="latest-title">{{ latest.title | escape }}</h2>
+    <a class="latest-entry-link{% if resolved_cover != '' %} has-cover{% endif %}" href="{{ latest.url | relative_url }}">
+      {% if resolved_cover != '' %}<img class="latest-cover" src="{{ resolved_cover | escape }}" width="240" height="180" alt="" decoding="async" />{% endif %}
+      <div class="latest-entry-text"><h2 id="latest-title">{{ latest.title | escape }}</h2>
       <p>
         {{ latest_excerpt | normalize_whitespace | truncate: 180 }}
       </p>
       <span class="read-link"
         >이어서 읽기 <span aria-hidden="true">↗</span></span
-      ></a
+      ></div></a
     >
   </section>
   {% endif %}

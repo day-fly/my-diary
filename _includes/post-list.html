@@ -28,6 +28,7 @@
     {% for post in site.posts %} {% assign category = post.category | default: '기록' %}
     {% assign card_excerpt = post.excerpt | strip_html | strip %}
     {% if card_excerpt == '' %}{% assign card_excerpt = post.content | strip_html | strip %}{% endif %}
+    {% include post-cover.html post=post %}
     <article
       class="post-card"
       data-category="{{ category | escape }}"
@@ -49,13 +50,14 @@
             >읽어보기 <span aria-hidden="true">↗</span></span
           >
         </div>
-        {% if post.cover %}<img
+        {% if resolved_cover != '' %}<img
           class="post-card-image"
-          src="{{ post.cover | relative_url }}"
+          src="{{ resolved_cover | escape }}"
           alt=""
           loading="lazy"
-          width="112"
-          height="132"
+          width="160"
+          height="120"
+          decoding="async"
         />{% endif %}
       </a>
     </article>

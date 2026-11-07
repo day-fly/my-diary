@@ -1,0 +1,20 @@
+{%- comment -%}Resolve an explicit cover or the first rendered body image, without duplicating baseurl.{%- endcomment -%}
+{%- assign resolved_cover = include.post.cover | default: '' -%}
+{%- if resolved_cover == '' and include.post.cover_auto != false -%}
+  {%- assign rendered_body = include.post.content | markdownify -%}
+  {%- if rendered_body contains '<img ' -%}
+    {%- assign first_image = rendered_body | split: '<img ' | slice: 1 | first | split: '>' | first -%}
+    {%- if first_image contains 'src="' -%}
+      {%- assign resolved_cover = first_image | split: 'src="' | last | split: '"' | first -%}
+    {%- elsif first_image contains "src='" -%}
+      {%- assign resolved_cover = first_image | split: "src='" | last | split: "'" | first -%}
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if resolved_cover != '' -%}
+  {%- assign cover_prefix = site.baseurl | append: '/' -%}
+  {%- assign cover_start = resolved_cover | slice: 0, cover_prefix.size -%}
+  {%- unless cover_start == cover_prefix -%}
+    {%- assign resolved_cover = resolved_cover | relative_url -%}
+  {%- endunless -%}
+{%- endif -%}

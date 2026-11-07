@@ -1,10 +1,12 @@
+{% include season-setup.html %}
 <!DOCTYPE html>
-<html lang="{{ site.lang | default: 'ko-KR' }}">
+<html lang="{{ site.lang | default: 'ko-KR' }}" data-season="{{ current_season }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="{{ page.excerpt | default: site.description | strip_html | normalize_whitespace | escape }}" />
     <meta name="theme-color" content="#f7f6f2" />
+    <script src="{{ '/assets/js/seasons.js' | relative_url }}"></script>
     <title>{% if page.title %}{{ page.title | escape }} · {% endif %}{{ site.title | escape }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +16,7 @@
   <body{% if page.permalink == '/write/' %} class="is-writer"{% endif %}>
     <a class="skip-link" href="#main">본문으로 건너뛰기</a>
     <header class="site-header">
-      <a class="site-title" href="{{ '/' | relative_url }}"><span class="brand-mark" aria-hidden="true">m.</span>{{ site.title }}</a>
+      <a class="site-title" href="{{ '/' | relative_url }}">{% include brand-mark.html %}{{ site.title }}</a>
       <nav class="site-nav" aria-label="주 메뉴">
         <a href="{{ '/' | relative_url }}"{% if page.url == '/' or page.url == '/archive/' %} aria-current="page"{% endif %}>기록</a>
         <a href="{{ '/about/' | relative_url }}"{% if page.url == '/about/' %} aria-current="page"{% endif %}>소개</a>
@@ -23,5 +25,6 @@
     </header>
     <main id="main" class="page-wrap" tabindex="-1">{{ content }}</main>
     <footer class="site-footer"><span>© {{ 'now' | date: '%Y' }} {{ site.title }}</span><span>시와 에세이, 그리고 지나가는 날들.</span></footer>
+    {% include background-music.html %}
   </body>
 </html>
