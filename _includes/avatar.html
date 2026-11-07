@@ -1,0 +1,13 @@
+{% assign avatar = site.data.profile.avatar %}
+<span
+  class="profile-avatar{% if include.large %} profile-avatar-large{% endif %}"
+>
+  {% if avatar and avatar != '' %}<img
+    src="{{ avatar | relative_url | escape }}"
+    alt="{{ site.data.profile.name | escape }} 프로필 사진"
+    width="80"
+    height="80"
+  />{% else %}<span aria-hidden="true"
+    >{{ site.data.profile.name | default: 'day-fly' | slice: 0 | upcase }}</span
+  >{% endif %}
+</span>

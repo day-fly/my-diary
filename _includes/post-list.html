@@ -1,0 +1,77 @@
+<section class="archive-section" aria-labelledby="archive-title" data-archive>
+  <div class="section-heading">
+    <h2 id="archive-title">
+      모든 기록 <span class="count">{{ site.posts.size }}</span>
+    </h2>
+    <label class="search-field"
+      ><span class="sr-only">글 검색</span><span aria-hidden="true">⌕</span
+      ><input
+        id="post-search"
+        type="search"
+        placeholder="제목이나 문장 검색"
+        autocomplete="off"
+    /></label>
+  </div>
+  <div class="archive-tools">
+    <div class="filter-tabs" role="group" aria-label="글 종류">
+      {% assign filters = '전체,시,에세이,일기,기록' | split: ',' %} {% for filter in filters %}<button
+        type="button"
+        data-filter="{{ filter }}"
+        aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"
+      >
+        {{ filter }}</button
+      >{% endfor %}
+    </div>
+    <span class="result-count" id="result-count" role="status">최신순</span>
+  </div>
+  <div class="post-list">
+    {% for post in site.posts %} {% assign category = post.category | default: '기록' %}
+    {% assign card_excerpt = post.excerpt | strip_html | strip %}
+    {% if card_excerpt == '' %}{% assign card_excerpt = post.content | strip_html | strip %}{% endif %}
+    <article
+      class="post-card"
+      data-category="{{ category | escape }}"
+      data-search="{{ post.title | append: ' ' | append: post.content | strip_html | normalize_whitespace | escape }}"
+    >
+      <a href="{{ post.url | relative_url }}" class="post-card-link">
+        <div class="post-card-body">
+          <div class="post-meta">
+            <span>{{ category }}</span><span aria-hidden="true">·</span
+            ><time datetime="{{ post.date | date_to_xmlschema }}"
+              >{{ post.date | date: '%Y.%m.%d' }}</time
+            >
+          </div>
+          <h3>{{ post.title | escape }}</h3>
+          <p class="post-card-excerpt">
+            {{ card_excerpt | normalize_whitespace | truncate: 130 }}
+          </p>
+          <span class="read-link"
+            >읽어보기 <span aria-hidden="true">↗</span></span
+          >
+        </div>
+        {% if post.cover %}<img
+          class="post-card-image"
+          src="{{ post.cover | relative_url }}"
+          alt=""
+          loading="lazy"
+          width="112"
+          height="132"
+        />{% endif %}
+      </a>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="empty-state" id="search-empty" {% if site.posts.size > 0 %} hidden{% endif %}>
+    <h3>
+      {% if site.posts.size > 0 %}찾는 기록이 없어요{% else %}아직은 빈
+      페이지예요{% endif %}
+    </h3>
+    <p>
+      {% if site.posts.size > 0 %}다른 검색어나 글 종류로 찾아보세요.{% else %}오늘의 첫 문장을 남겨보세요.{% endif %}
+    </p>
+    <button class="btn-light" id="reset-search" type="button">
+      전체 기록 보기
+    </button>
+  </div>
+</section>
+<script src="{{ '/assets/js/archive.js' | relative_url }}" defer></script>
