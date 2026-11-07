@@ -36,6 +36,7 @@
   var titleInput = document.getElementById("post-title");
   var dateInput = document.getElementById("post-date");
   var coverInput = document.getElementById("cover-image");
+  var autoCoverInput = document.getElementById("auto-cover");
   var coverUrlInput = document.getElementById("cover-url");
   var galleryInput = document.getElementById("gallery-images");
   var bodyInput = document.getElementById("post-body");
@@ -759,7 +760,69 @@
         previewGallery.appendChild(frame);
       });
     }
+    if (!coverInput.files.length)
+      document.getElementById("cover-file-status").textContent =
+        "긴 변 1,600px 이내로 줄여 JPG로 저장해요. 작은 사진은 확대하지 않아요.";
+    updateCoverCard();
   }
+
+  function updateCoverCard() {
+    var source = coverObjectUrl || toSafePreviewUrl(coverUrlInput.value.trim());
+    var automatic = false;
+    if (!source && autoCoverInput.checked) {
+      var firstBodyImage = previewBody.querySelector("img");
+      source = firstBodyImage
+        ? firstBodyImage.getAttribute("src")
+        : appendGalleryInput.checked
+          ? galleryObjectUrls[0]
+          : "";
+      automatic = !!source;
+    }
+    var image = document.getElementById("cover-card-preview");
+    image.hidden = !source;
+    if (source) image.src = source;
+    else image.removeAttribute("src");
+    document.getElementById("cover-preview-note").textContent = source
+      ? automatic
+        ? "본문 첫 사진을 자동으로 사용합니다."
+        : "선택한 사진을 표지로 사용합니다."
+      : autoCoverInput.checked
+        ? "사진을 추가하면 여기에 표시됩니다."
+        : "이 글은 표지 없이 표시됩니다.";
+  }
+
+  coverInput.addEventListener("change", async function () {
+    var file = coverInput.files[0];
+    var status = document.getElementById("cover-file-status");
+    if (!file) {
+      status.textContent = "긴 변 1,600px 이내로 줄여 JPG로 저장해요.";
+      return;
+    }
+    try {
+      validateImage(file);
+      status.textContent = "표지 사진 크기를 조정하고 있어요…";
+      var prepared = await window.DiaryCoverImage.prepare(file);
+      if (coverInput.files[0] !== file) return;
+      status.textContent =
+        prepared.width +
+        " × " +
+        prepared.height +
+        "px · " +
+        Math.ceil(prepared.file.size / 1024) +
+        "KB · 발행할 때 저장됩니다.";
+    } catch (error) {
+      if (coverInput.files[0] === file) status.textContent = error.message;
+    }
+  });
+  document.getElementById("clear-cover").addEventListener("click", function () {
+    coverInput.value = "";
+    coverUrlInput.value = "";
+    autoCoverInput.checked = false;
+    document.getElementById("cover-file-status").textContent =
+      "표지 사진을 다시 선택할 수 있어요.";
+    updatePreview();
+    saveDraft();
+  });
 
   async function githubFetch(url, token, options) {
     var finalOptions = options || {};
@@ -1019,7 +1082,7 @@
     var keep = false;
     loadedFrontMatter.split("\n").forEach(function (line) {
       if (/^[^\s#][^:]*:/.test(line))
-        keep = !/^(title|date|cover|category):/.test(line);
+        keep = !/^(title|date|cover|cover_auto|category):/.test(line);
       if (keep) lines.push(line);
     });
     lines.push('title: "' + escapeYaml(payload.title) + '"');
@@ -1028,6 +1091,7 @@
       lines.push('category: "' + escapeYaml(categoryInput.value) + '"');
     if (payload.coverUrl)
       lines.push('cover: "' + escapeYaml(payload.coverUrl) + '"');
+    if (!autoCoverInput.checked) lines.push("cover_auto: false");
     lines.push("---");
     lines.push("");
     lines.push(payload.body || "");
@@ -1068,6 +1132,7 @@
     bodyInput.value = "";
     coverUrlInput.value = "";
     coverInput.value = "";
+    autoCoverInput.checked = true;
     galleryInput.value = "";
     appendGalleryInput.checked = true;
     dateInput.value = formatDatetimeLocal(new Date());
@@ -1332,6 +1397,7 @@
       setCategory(parsed.data.category || "");
       titleInput.value = parsed.data.title || "";
       coverUrlInput.value = parsed.data.cover || "";
+      autoCoverInput.checked = parsed.data.cover_auto !== "false";
       bodyInput.value = parsed.body.replace(/^\n+/, "");
       currentPostPathInput.value = path;
       coverInput.value = "";
@@ -1544,12 +1610,15 @@
 
       if (coverInput.files && coverInput.files[0]) {
         setStatus("표지 사진 업로드 중...", "status-info");
+        var preparedCover = await window.DiaryCoverImage.prepare(
+          coverInput.files[0],
+        );
         coverUrl = await uploadImage(
           info.owner,
           info.repo,
           info.branch,
           info.token,
-          coverInput.files[0],
+          preparedCover.file,
           slug,
         );
         coverUrlInput.value = coverUrl;
@@ -1662,6 +1731,7 @@
       date: dateInput.value,
       category: categoryInput.value,
       cover: coverUrlInput.value,
+      autoCover: autoCoverInput.checked,
       path: currentPostPathInput.value,
       sha: loadedSha,
       frontMatter: loadedFrontMatter,
@@ -1678,6 +1748,7 @@
       dateInput.value,
       categoryInput.value,
       coverUrlInput.value,
+      autoCoverInput.checked,
     ]);
   }
   function hasChanges() {
@@ -1735,6 +1806,7 @@
       dateInput.value = draft.date || formatDatetimeLocal(new Date());
       setCategory(draft.category || "");
       coverUrlInput.value = draft.cover || "";
+      autoCoverInput.checked = draft.autoCover !== false;
       currentPostPathInput.value = draft.path || "";
       loadedSha = draft.sha || null;
       loadedFrontMatter = draft.frontMatter || "";
@@ -2127,6 +2199,7 @@
     bodyInput,
     coverInput,
     coverUrlInput,
+    autoCoverInput,
     galleryInput,
     categoryInput,
     appendGalleryInput,
