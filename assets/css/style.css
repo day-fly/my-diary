@@ -524,8 +524,15 @@ h1 {
 .post-cover img {
   display: block;
   width: 100%;
+  height: auto;
   max-height: 650px;
   object-fit: contain;
+}
+.illustration-caption {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--ink-soft);
 }
 .post-content {
   font-family: var(--serif);
