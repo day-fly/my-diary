@@ -1,10 +1,12 @@
+{% include season-setup.html %}
 <!DOCTYPE html>
-<html lang="{{ site.lang | default: 'ko-KR' }}">
+<html lang="{{ site.lang | default: 'ko-KR' }}" data-season="{{ current_season }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="{{ page.excerpt | default: site.description | strip_html | normalize_whitespace | escape }}" />
     <meta name="theme-color" content="#f7f6f2" />
+    <script src="{{ '/assets/js/seasons.js' | relative_url }}"></script>
     <title>{% if page.title %}{{ page.title | escape }} · {% endif %}{{ site.title | escape }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

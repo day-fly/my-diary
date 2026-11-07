@@ -2,11 +2,13 @@
 layout: default
 ---
 
+{% include season-setup.html %}
 <section class="home-intro">
-  <p class="eyebrow">A PERSONAL JOURNAL</p>
+  <p class="eyebrow">A PERSONAL JOURNAL <span class="season-label" data-season-name>{{ season_name }}의 기록</span></p>
+  {% include season-art.html %}
   <h1>흘러가는 날들,<br />남겨두고 싶은 문장.</h1>
   <p>시와 에세이, 그리고 일상의 작은 마음들을 모읍니다.</p>
-  <span class="intro-note" aria-hidden="true">마음이 머무는 곳에, 기록을.</span>
+  <span class="intro-note" data-season-note aria-hidden="true">마음이 머무는 곳에, 기록을.</span>
 </section>
 <div class="home-feature">
   {% assign latest = site.posts.first %} {% if latest %}
