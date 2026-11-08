@@ -538,12 +538,6 @@ h1 {
   max-height: 650px;
   object-fit: contain;
 }
-.illustration-caption {
-  margin-top: 8px;
-  text-align: right;
-  font-size: 10px;
-  color: var(--ink-soft);
-}
 .post-content {
   font-family: var(--serif);
   font-size: 16px;

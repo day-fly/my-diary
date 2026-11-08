@@ -26,7 +26,6 @@ illustration_height: 900
     {% if page.illustration %}
     <figure class="about-illustration">
       <img src="{{ page.illustration | relative_url }}" srcset="{{ page.illustration_small | relative_url }} 640w, {{ page.illustration | relative_url }} 1200w" sizes="(max-width: 760px) calc(100vw - 40px), (max-width: 1016px) calc(50vw - 50px), 458px" width="{{ page.illustration_width }}" height="{{ page.illustration_height }}" alt="{{ page.illustration_alt | escape }}" decoding="async" />
-      <figcaption class="illustration-caption">하루를 기록하는 마음을 담은 AI 삽화</figcaption>
     </figure>
     {% endif %}
     {% if site.data.profile.bio and site.data.profile.bio != '' %}<div class="about-bio">{{ site.data.profile.bio | escape | newline_to_br }}</div>{% else %}<div class="about-bio"><p>시와 에세이, 일상의 기록이 모이는 작은 공간입니다.<br />천천히 읽고, 잠시 머물러 주세요.</p></div>{% endif %}
