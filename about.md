@@ -32,5 +32,5 @@ illustration_height: 900
   </div>
   {% assign website_start = site.data.profile.website | slice: 0, 8 %}
   {% if website_start == 'https://' %}<a class="btn-light" href="{{ site.data.profile.website | escape }}" target="_blank" rel="noopener noreferrer">나의 다른 공간 ↗</a>{% endif %}
-  <div class="about-bottom"><a class="text-link" href="{{ '/' | relative_url }}">{{ site.posts.size }}편의 기록 읽기 →</a><a class="text-link muted" href="{{ '/write/#profile' | relative_url }}">프로필 편집</a></div>
+  <div class="about-bottom"><a class="text-link" href="{{ '/' | relative_url }}">{{ site.posts.size }}편의 기록 읽기 →</a><a class="text-link muted" href="{{ '/write/#profile' | relative_url }}" data-author-only hidden>프로필 편집</a></div>
 </section>

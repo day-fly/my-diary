@@ -4,6 +4,10 @@ url: "https://day-fly.github.io"
 baseurl: "/my-diary"
 lang: "ko-KR"
 timezone: "Asia/Seoul"
+writer:
+  owner: "day-fly"
+  repo: "my-diary"
+  branch: "main"
 
 markdown: kramdown
 kramdown:

@@ -718,6 +718,10 @@ h1 {
   max-width: 880px;
   margin: auto;
 }
+.writer-login-help { color: var(--ink-soft); line-height: 1.9; margin: 0 0 26px; }
+body:not([data-author-state="authenticated"]) .writer-page { max-width: 620px; }
+.writer-connection-panel .writer-inline { margin-top: 16px; }
+.writer-connection-panel .advanced-settings { margin-top: 22px; }
 .writer-heading {
   display: flex;
   align-items: center;
