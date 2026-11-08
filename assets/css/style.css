@@ -1,3 +1,24 @@
+@font-face {
+  font-family: "MaruBuri";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/maruburi/MaruBuri-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "MaruBuri";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/maruburi/MaruBuri-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "MaruBuri";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fonts/maruburi/MaruBuri-Bold.woff2") format("woff2");
+}
 :root {
   --bg: #f7f6f2;
   --paper: #fffefa;
@@ -13,8 +34,8 @@
   --avatar-ink: #6d7d65;
   --subtle-surface: #f2f3ed;
   --accent-hover: #3d5345;
-  --serif: "Noto Serif KR", serif;
-  --sans: "Noto Sans KR", sans-serif;
+  --serif: "MaruBuri", "AppleMyungjo", "Batang", serif;
+  --sans: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
 }
 * {
   box-sizing: border-box;
@@ -35,6 +56,7 @@ input,
 textarea,
 select {
   font: inherit;
+  font-family: var(--sans);
   color: inherit;
 }
 a {

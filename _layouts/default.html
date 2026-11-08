@@ -8,9 +8,9 @@
     <meta name="theme-color" content="#f7f6f2" />
     <script src="{{ '/assets/js/seasons.js' | relative_url }}"></script>
     <title>{% if page.title %}{{ page.title | escape }} · {% endif %}{{ site.title | escape }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preload" href="{{ '/assets/fonts/maruburi/MaruBuri-Regular.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" crossorigin />
     <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}?v={{ site.time | date: '%s' }}" />
   </head>
   <body{% if page.permalink == '/write/' %} class="is-writer"{% endif %}>
