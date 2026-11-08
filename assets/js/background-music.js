@@ -3,6 +3,12 @@
   const player = document.querySelector(".music-player");
   if (!player) return;
   const audio = player.querySelector("audio");
+  const select = player.querySelector("#music-track-select");
+  if (!audio || !select) return;
+  const tracks = Array.from(select.options).map(option => ({ id: option.value, ...option.dataset }));
+  if (!tracks.length || new Set(tracks.map(track => track.id)).size !== tracks.length) return;
+  const trackById = new Map(tracks.map(track => [track.id, track]));
+  const ids = tracks.map(track => track.id);
   const toggles = Array.from(player.querySelectorAll("[data-music-toggle]"));
   const stateLabel = player.querySelector(".music-state");
   const panelToggle = player.querySelector(".music-panel-toggle");
@@ -12,25 +18,65 @@
   const volumeValue = player.querySelector("#music-volume-value");
   const message = player.querySelector(".music-message");
   const help = player.querySelector(".music-help");
-  const storageKey = "diary:music:" + audio.dataset.src;
+  const shuffleButton = player.querySelector(".music-shuffle");
+  const previous = player.querySelector(".music-previous");
+  const next = player.querySelector(".music-next");
+  const storageKey = "diary:music:playlist:v1:" + player.dataset.base;
   const preferenceKey = storageKey + ":preference";
-  let saved = {}, preference = {};
-  try { saved = JSON.parse(sessionStorage.getItem(storageKey)) || {}; } catch (_) {}
-  try { preference = JSON.parse(localStorage.getItem(preferenceKey)) || {}; } catch (_) {}
+  const legacyKey = "diary:music:" + audio.dataset.src;
+  const helpText = "한 곡이 끝나면 다음 곡으로 이어집니다. 듣던 곡과 위치, 소리 설정을 기억해요.";
+  function read(storage, key) {
+    try {
+      const value = JSON.parse(window[storage].getItem(key) || "null");
+      return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+    } catch (_) { return null; }
+  }
+  const currentSaved = read("sessionStorage", storageKey);
+  const saved = currentSaved || read("sessionStorage", legacyKey) || {};
+  const preference = read("localStorage", preferenceKey) || read("localStorage", legacyKey + ":preference") || {};
   let enabled = typeof preference.enabled === "boolean" ? preference.enabled : saved.enabled !== false;
-  let resumeAt = Number.isFinite(saved.position) && saved.position > 0 ? saved.position : 0;
+  let shuffle = typeof preference.shuffle === "boolean" ? preference.shuffle : true;
   const savedVolume = preference.volume ?? saved.volume;
   let level = Number.isFinite(savedVolume) && savedVolume >= 0 && savedVolume <= 1 ? savedVolume : 0.2;
-  let wanted = false, request = 0, lastSaved = 0;
-  let leaving = false;
+  const legacyId = tracks.find(track => track.src === audio.dataset.src)?.id;
+  const savedId = trackById.has(saved.track) ? saved.track : !currentSaved && Number.isFinite(saved.position) ? legacyId : null;
+  function shuffled(values) {
+    const result = [...values];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }
+  const validQueue = Array.isArray(saved.queue) && saved.queue.length === ids.length && new Set(saved.queue).size === ids.length && saved.queue.every(id => trackById.has(id));
+  let queue = shuffle && validQueue && saved.shuffle === shuffle ? [...saved.queue] : shuffle ? shuffled(ids) : [...ids];
+  if (shuffle && !savedId && queue.length > 1 && queue[0] === preference.lastTrack) queue.push(queue.shift());
+  let cursor = savedId ? queue.indexOf(savedId) : 0;
+  let resumeAt = savedId && Number.isFinite(saved.position) && saved.position > 0 ? saved.position : 0;
+  let wanted = false, request = 0, lastSaved = 0, leaving = false;
+  audio.loop = false;
+  function current() { return trackById.get(queue[cursor]); }
   function persist() {
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify({ position: resumeAt || audio.currentTime || 0, volume: level, enabled }));
+      const position = resumeAt || (audio.hasAttribute("src") && Number.isFinite(audio.currentTime) ? audio.currentTime : 0);
+      sessionStorage.setItem(storageKey, JSON.stringify({ track: current().id, position, queue, shuffle, volume: level, enabled }));
     } catch (_) {}
   }
   function savePreference() {
-    try { localStorage.setItem(preferenceKey, JSON.stringify({ enabled, volume: level })); } catch (_) {}
+    try { localStorage.setItem(preferenceKey, JSON.stringify({ enabled, volume: level, shuffle, lastTrack: current().id })); } catch (_) {}
     persist();
+  }
+  function updateTrack() {
+    const track = current();
+    select.value = track.id;
+    player.querySelector(".music-track").textContent = track.title;
+    player.querySelector(".music-description").textContent = track.description;
+    const credit = player.querySelector(".music-credit a");
+    credit.textContent = track.artist + " · 곡 정보 ↗";
+    credit.href = track.credit;
+    shuffleButton.setAttribute("aria-pressed", String(shuffle));
+    shuffleButton.textContent = shuffle ? "섞어 듣기 켜짐" : "섞어 듣기 꺼짐";
+    previous.disabled = next.disabled = tracks.length < 2;
   }
   function showState(state) {
     player.dataset.state = state;
@@ -70,49 +116,70 @@
     const attempt = ++request;
     showMessage("");
     showState("loading");
-    if (!audio.hasAttribute("src")) audio.src = audio.dataset.src;
+    if (!audio.hasAttribute("src")) audio.src = current().src;
     else if (audio.error) audio.load();
     if (audio.readyState >= 1) restorePosition();
-    // A rejected autoplay attempt leaves a normal, usable play button.
     audio.play().then(() => {
-      if (attempt === request && wanted) {
-        showState("playing");
-        help.textContent = "음악을 끄거나 소리 크기를 바꾸면 다음 방문에도 기억해요. 휴대폰에서는 기기의 음량 버튼도 이용하세요.";
-      }
+      if (attempt === request && wanted) { showState("playing"); help.textContent = helpText; }
     }, error => {
       if (attempt !== request) return;
       wanted = false;
       showState("paused");
       const text = error.name === "NotAllowedError"
         ? "자동 재생이 제한된 브라우저예요. 재생 버튼을 누르면 음악이 시작됩니다."
-        : "음악을 불러오지 못했어요. 잠시 후 다시 재생해 주세요.";
+        : "음악을 불러오지 못했어요. 다시 재생하거나 다음 곡을 골라 주세요.";
       help.textContent = text;
       if (!automatic) showMessage(text);
     });
   }
+  function choose(index, automatic = false) {
+    if (leaving) return;
+    stop();
+    cursor = (index + queue.length) % queue.length;
+    resumeAt = 0;
+    audio.removeAttribute("src");
+    audio.load();
+    updateTrack();
+    showMessage("");
+    help.textContent = helpText;
+    savePreference();
+    if (enabled) start(automatic);
+  }
   toggles.forEach(button => button.addEventListener("click", () => {
-    if (wanted) {
-      enabled = false;
-      stop();
-      showMessage("");
-    } else {
-      enabled = true;
-      start();
-    }
+    if (wanted) { enabled = false; stop(); showMessage(""); }
+    else { enabled = true; start(); }
     savePreference();
   }));
+  previous.addEventListener("click", () => choose(cursor - 1));
+  next.addEventListener("click", () => choose(cursor + 1));
+  select.addEventListener("change", () => {
+    const index = queue.indexOf(select.value);
+    if (index >= 0 && index !== cursor) choose(index);
+  });
+  shuffleButton.addEventListener("click", () => {
+    const id = current().id;
+    shuffle = !shuffle;
+    queue = shuffle ? [id, ...shuffled(ids.filter(value => value !== id))] : [...ids];
+    cursor = queue.indexOf(id);
+    updateTrack();
+    savePreference();
+  });
   audio.addEventListener("loadedmetadata", restorePosition);
   audio.addEventListener("playing", () => { if (wanted) showState("playing"); else audio.pause(); });
   audio.addEventListener("waiting", () => { if (wanted) showState("loading"); });
   audio.addEventListener("pause", () => {
+    // A pause queued by the previous source must not cancel the new source's play().
+    if (!audio.paused) return;
     wanted = false;
     request++;
     persist();
     showState("paused");
   });
+  audio.addEventListener("ended", () => { if (enabled && !leaving && audio.ended) choose(cursor + 1, true); });
   audio.addEventListener("error", () => {
+    if (!audio.error) return;
     stop();
-    help.textContent = "음악을 불러오지 못했어요. 잠시 후 다시 재생해 주세요.";
+    help.textContent = "음악을 불러오지 못했어요. 다시 재생하거나 다음 곡을 골라 주세요.";
     if (!panel.hidden) showMessage(help.textContent);
   });
   audio.addEventListener("timeupdate", () => {
@@ -136,10 +203,12 @@
   window.addEventListener("pageshow", event => {
     if (event.persisted) { leaving = false; compact(); if (enabled) start(true); }
   });
+  updateTrack();
   setVolume();
   showState("paused");
   compact();
   player.hidden = false;
   document.body.classList.add("has-music");
+  savePreference();
   if (enabled) start(true);
 })();
