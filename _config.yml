@@ -8,6 +8,8 @@ writer:
   owner: "day-fly"
   repo: "my-diary"
   branch: "main"
+  private_repo: "my-diary-private"
+  private_branch: "main"
 
 markdown: kramdown
 kramdown:

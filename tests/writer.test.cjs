@@ -40,7 +40,7 @@ function setup({
   });
   const w = dom.window,
     d = w.document;
-  Object.assign(w, { TextEncoder, TextDecoder, confirm: () => true });
+  Object.assign(w, { TextEncoder, TextDecoder, AbortController, confirm: () => true });
   w.HTMLElement.prototype.scrollIntoView = () => {};
   w.URL.createObjectURL = () => "blob:test";
   w.URL.revokeObjectURL = () => {};
@@ -111,6 +111,7 @@ function setup({
     d.getElementById("profile-" + field).value = value;
   });
   w.eval(readFileSync("assets/js/cover-image.js", "utf8"));
+  w.eval(readFileSync("assets/js/private-posts.js", "utf8"));
   w.eval(script);
   function input(id, value) {
     d.getElementById(id).value = value;
