@@ -19,6 +19,7 @@
     </div>
     <label class="music-volume" for="music-volume">소리 크기 <output id="music-volume-value" for="music-volume">20%</output></label>
     <input id="music-volume" type="range" min="0" max="100" step="5" value="20" aria-describedby="music-help" />
+    <button type="button" class="music-stop-all">모든 탭 음악 끄기</button>
     <p class="music-help" id="music-help">한 곡이 끝나면 다음 곡으로 이어집니다. 듣던 곡과 위치, 소리 설정을 기억해요.</p>
     <a class="music-license" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0 · 원곡 그대로 사용</a>
     <div><button class="effects-toggle" type="button" data-season-effects-toggle aria-pressed="true" hidden>계절 효과 끄기</button></div>
@@ -33,4 +34,5 @@
   <p class="music-message" role="status" hidden></p>
   <audio id="background-audio" preload="none" data-src="{{ '/assets/audio/touching-moments-one-pulse.mp3' | relative_url }}"></audio>
 </aside>
+<script src="{{ '/assets/js/music-coordinator.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
 <script src="{{ '/assets/js/background-music.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>

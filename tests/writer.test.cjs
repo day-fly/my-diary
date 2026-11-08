@@ -535,7 +535,9 @@ test("built archive uses each existing photo without duplicating the GitHub Page
     const thumbnail = card.querySelector(".post-card-image");
     if (thumbnail) {
       assert.ok(source);
-      assert.equal(thumbnail.getAttribute("src"), source.getAttribute("src"));
+      const photos = Object.values(JSON.parse(readFileSync("_data/photos.json", "utf8")));
+      const photo = photos.find(photo => "/my-diary" + photo.display === source.getAttribute("src"));
+      assert.equal(thumbnail.getAttribute("src"), photo ? "/my-diary" + photo.small : source.getAttribute("src"));
       assert.equal(thumbnail.getAttribute("loading"), "lazy");
       assert.ok(!thumbnail.getAttribute("src").includes("/my-diary/my-diary/"));
     }

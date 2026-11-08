@@ -46,6 +46,8 @@
   var visibilityInput = document.getElementById("post-visibility");
   var coverInput = document.getElementById("cover-image");
   var autoCoverInput = document.getElementById("auto-cover");
+  var coverXInput = document.getElementById("cover-x"), coverYInput = document.getElementById("cover-y");
+  function coverPosition(x, y) { coverXInput.value = Math.max(0,Math.min(100,Number.isFinite(Number(x)) ? Number(x) : 50)); coverYInput.value = Math.max(0,Math.min(100,Number.isFinite(Number(y)) ? Number(y) : 50)); }
   var coverUrlInput = document.getElementById("cover-url");
   var galleryInput = document.getElementById("gallery-images");
   var bodyInput = document.getElementById("post-body");
@@ -799,6 +801,7 @@
       automatic = !!source;
     }
     var image = document.getElementById("cover-card-preview");
+    image.style.objectPosition = coverXInput.value + "% " + coverYInput.value + "%";
     image.hidden = !source;
     if (source) image.src = source;
     else image.removeAttribute("src");
@@ -1058,8 +1061,10 @@
   async function uploadImage(owner, repo, branch, token, file, prefix, index) {
     validateImage(file);
     var destination = owner + "/" + repo + ":" + branch;
-    var cached = imageUploadCache.get(file);
+    var sourceFile = file;
+    var cached = imageUploadCache.get(sourceFile);
     if (cached && cached.destination === destination) return cached.url;
+    if (window.DiaryPhotoImage) file = await window.DiaryPhotoImage.prepare(file);
     var now = new Date();
     var ext = fileExtension(file);
     var fileBase =
@@ -1090,11 +1095,11 @@
       contentBase64: base64,
       message: "Upload diary image: " + imagePath,
     });
-    imageUploadCache.set(file, {
+    imageUploadCache.set(sourceFile, {
       destination: destination,
       url: (window.DiaryPrivate && window.DiaryPrivate.isPrivate(repo) ? "diary-private:" : "") + "/" + imagePath,
     });
-    return imageUploadCache.get(file).url;
+    return imageUploadCache.get(sourceFile).url;
   }
 
   async function buildUniquePostPath(
@@ -1126,7 +1131,7 @@
     var keep = false;
     loadedFrontMatter.split("\n").forEach(function (line) {
       if (/^[^\s#][^:]*:/.test(line))
-        keep = !/^(title|date|cover|cover_auto|diary_revision):/.test(line);
+        keep = !/^(title|date|cover|cover_auto|cover_x|cover_y|diary_revision):/.test(line);
       if (keep) lines.push(line);
     });
     lines.push('title: "' + escapeYaml(payload.title) + '"');
@@ -1134,6 +1139,7 @@
     if (payload.revision) lines.push('diary_revision: "' + payload.revision + '"');
     if (payload.coverUrl)
       lines.push('cover: "' + escapeYaml(payload.coverUrl) + '"');
+    lines.push("cover_x: " + coverXInput.value); lines.push("cover_y: " + coverYInput.value);
     if (!autoCoverInput.checked) lines.push("cover_auto: false");
     lines.push("---");
     lines.push("");
@@ -1179,7 +1185,7 @@
     bodyInput.value = "";
     coverUrlInput.value = "";
     coverInput.value = "";
-    autoCoverInput.checked = true;
+    autoCoverInput.checked = true; coverPosition(50,50);
     galleryInput.value = "";
     appendGalleryInput.checked = true;
     dateInput.value = formatDatetimeLocal(new Date());
@@ -1512,7 +1518,7 @@
       loadedFrontMatter = parsed.frontMatter || "";
       titleInput.value = parsed.data.title || "";
       coverUrlInput.value = parsed.data.cover || "";
-      autoCoverInput.checked = parsed.data.cover_auto !== "false";
+      autoCoverInput.checked = parsed.data.cover_auto !== "false"; coverPosition(parsed.data.cover_x ?? 50,parsed.data.cover_y ?? 50);
       bodyInput.value = parsed.body.replace(/^\n+/, "");
       currentPostPathInput.value = path;
       coverInput.value = "";
@@ -1557,7 +1563,7 @@
       return;
     }
 
-    if (!window.confirm("정말 삭제할까요?\n" + path)) return;
+    if (!window.confirm("이 글을 휴지통으로 옮길까요? 나중에 복원할 수 있습니다.")) return;
 
     try {
       setBusy(true);
@@ -1566,6 +1572,9 @@
       setStatus("포스트 삭제 중...", "status-info");
 
       if (loadedVisibility === "private") info = await window.DiaryPrivate.check(info);
+      var trashSource = await getContentMeta(info.owner,info.repo,info.branch,path,info.token);
+      if (!trashSource || trashSource.sha !== loadedSha) throw new Error("다른 곳에서 글이 변경됐어요. 다시 불러와 주세요.");
+      await window.DiaryRecovery.capture(info,{kind:"post",path:path,sha:loadedSha,title:titleInput.value,visibility:loadedVisibility,content:base64ToUtf8(trashSource.content)});
       var deleted = await deleteContent({
         expectedSha: loadedSha,
         owner: info.owner,
@@ -1579,7 +1588,7 @@
       if (loadedVisibility === "public" && window.DiaryPublication) window.DiaryPublication.start({path:path,visibility:"private",commit:deleted && deleted.commit && deleted.commit.sha}, ensureConnectionInfo());
       if (currentPostPathInput.value.trim() === path) resetDraftMode();
       await loadPostList();
-      setStatus("삭제 완료: " + path, "status-success");
+      setStatus("휴지통으로 옮겼어요. 글 관리의 휴지통에서 복원할 수 있습니다.", "status-success");
     } catch (error) {
       setStatus("삭제 실패: " + error.message, "status-error");
     } finally {
@@ -1618,17 +1627,9 @@
     return data;
   }
   function renderSavedPhotos() {
-    var box = document.getElementById("saved-draft-photos");
-    box.replaceChildren(); box.hidden = !savedGallery.length;
-    savedGallery.forEach(function (url, index) {
-      var frame = document.createElement("div");
-      var image = document.createElement("img"); image.alt = "보관된 본문 사진 " + (index + 1);
-      var source = toSafePreviewUrl(url); if (source) image.src = source;
-      var remove = document.createElement("button"); remove.type = "button"; remove.className = "btn-light";
-      remove.textContent = "사진 " + (index + 1) + " 빼기"; remove.disabled = busy;
-      remove.addEventListener("click", function () { savedGallery.splice(index, 1); updatePreview(); saveDraft(); });
-      frame.append(image, remove); box.appendChild(frame);
-    });
+    window.DiaryPhotoEditor?.render({body:bodyInput.value,gallery:savedGallery.slice(),busy:busy,url:toSafePreviewUrl,
+      stage:function(file){validateImage(file);return window.DiaryPrivate.stage(file);},
+      change:function(body,gallery){bodyInput.value=body;savedGallery=gallery;updatePreview();saveDraft();},error:function(message){setStatus(message,"status-error");}});
   }
   async function saveCloudDraft(asCopy) {
     if (busy) return;
@@ -1651,7 +1652,8 @@
       if (coverInput.files[0]) data.cover = await upload((await window.DiaryCoverImage.prepare(coverInput.files[0])).file);
       data.body = await window.DiaryPrivate.prepare(data.body, target, upload, true);
       data.cover = await window.DiaryPrivate.prepare(data.cover, target, upload, true);
-      data.galleryRefs = savedGallery.slice();
+      data.galleryRefs = [];
+      for (var ref of savedGallery) data.galleryRefs.push(await window.DiaryPrivate.prepare(ref, target, upload, true));
       for (var file of Array.from(galleryInput.files)) data.galleryRefs.push(await upload(file));
       data.version = 1; data.hasFiles = false; data.privateWorkspace = true;
       delete data.cloudDraftId; delete data.cloudDraftSha; delete data.cloudSnapshot;
@@ -1690,7 +1692,7 @@
       loadedVisibility = data.loadedVisibility === "private" ? "private" : "public";
       currentPostPathInput.value = data.path || ""; loadedSha = data.sha || null;
       loadedFrontMatter = typeof data.frontMatter === "string" ? data.frontMatter : ""; moveTarget = data.moveTarget || null;
-      coverUrlInput.value = data.cover || ""; autoCoverInput.checked = data.autoCover !== false;
+      coverUrlInput.value = data.cover || ""; autoCoverInput.checked = data.autoCover !== false; coverPosition(data.coverX ?? 50,data.coverY ?? 50);
       appendGalleryInput.checked = data.appendGallery !== false; savedGallery = data.galleryRefs;
       coverInput.value = ""; galleryInput.value = ""; cloudDraftId = item.id; cloudDraftSha = meta.sha; privateWorkspace = true;
       publishedSnapshot = data.publishedSnapshot || ""; cloudSnapshot = snapshot();
@@ -1701,15 +1703,18 @@
     finally { setBusy(false); }
   }
   async function deleteCloudDraft(item) {
-    if (busy || !window.confirm("이 임시글을 보관함에서 삭제할까요? 발행한 글은 그대로 유지됩니다.")) return;
+    if (busy || !window.confirm("이 임시글을 휴지통으로 옮길까요? 발행한 글은 그대로 유지됩니다.")) return;
     var info = ensureConnectionInfo(); if (!info) return;
     setBusy(true);
     try {
       var target = await window.DiaryPrivate.check(info);
+      var trashDraft = await getContentMeta(target.owner,target.repo,target.branch,cloudDraftPath(item.id),target.token);
+      if (!trashDraft || trashDraft.sha !== item.sha) throw new Error("다른 기기에서 임시글이 변경됐어요. 다시 불러와 주세요.");
+      await window.DiaryRecovery.capture(info,{kind:"draft",path:cloudDraftPath(item.id),sha:item.sha,title:item.title,visibility:"private",content:base64ToUtf8(trashDraft.content)});
       await deleteContent({ owner:target.owner, repo:target.repo, branch:target.branch, token:target.token, path:cloudDraftPath(item.id), expectedSha:item.sha, message:"Remove private diary draft" });
       if (!ensureConnectionInfo()) return;
       if (cloudDraftId === item.id) { cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; saveDraft(); }
-      await loadPostList(true); setStatus("임시글을 보관함에서 삭제했어요.", "status-success");
+      await loadPostList(true); setStatus("임시글을 휴지통으로 옮겼어요.", "status-success");
     } catch (error) { setStatus("임시글 삭제 실패: " + error.message, "status-error"); }
     finally { setBusy(false); }
   }
@@ -1986,13 +1991,14 @@
       body: bodyInput.value,
       date: dateInput.value,
       cover: coverUrlInput.value,
+      coverX: Number(coverXInput.value), coverY: Number(coverYInput.value),
       autoCover: autoCoverInput.checked,
       path: currentPostPathInput.value,
       sha: loadedSha,
       frontMatter: loadedFrontMatter,
       appendGallery: appendGalleryInput.checked,
       publishedSnapshot: publishedSnapshot,
-      hasFiles: !!(coverInput.files.length || galleryInput.files.length),
+      hasFiles: !!(coverInput.files.length || galleryInput.files.length || window.DiaryPrivate?.hasPending(bodyInput.value+"\n"+savedGallery.join("\n"))),
       updatedAt: new Date().toISOString(),
     };
   }
@@ -2004,7 +2010,7 @@
       coverUrlInput.value,
       autoCoverInput.checked,
       visibilityInput.value,
-      savedGallery, appendGalleryInput.checked,
+      savedGallery, appendGalleryInput.checked, coverXInput.value, coverYInput.value,
     ]);
   }
   function hasChanges() {
@@ -2043,7 +2049,7 @@
         });
       if (privateDraft) draftStatus.textContent += " · 이 탭에서만 보관";
       if (cloudDraftId) draftStatus.textContent += snapshot() === cloudSnapshot ? " · 보관함에도 저장됨" : " · 보관함 저장 필요";
-      if (coverInput.files.length || galleryInput.files.length || (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value)))
+      if (coverInput.files.length || galleryInput.files.length || (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value + "\n" + savedGallery.join("\n"))))
         draftStatus.textContent += " · 다시 열 때 사진 재첨부 필요";
     } catch (_) {
       draftSaved = false;
@@ -2072,7 +2078,7 @@
       bodyInput.value = draft.body;
       dateInput.value = draft.date || formatDatetimeLocal(new Date());
       coverUrlInput.value = draft.cover || "";
-      autoCoverInput.checked = draft.autoCover !== false;
+      autoCoverInput.checked = draft.autoCover !== false; coverPosition(draft.coverX ?? 50,draft.coverY ?? 50);
       currentPostPathInput.value = draft.path || "";
       loadedSha = draft.sha || null;
       loadedFrontMatter = draft.frontMatter || "";
@@ -2095,6 +2101,7 @@
       ? "비공개 글과 새 사진은 나만 보는 저장 공간에 보관됩니다. 작성 중인 글은 보관함 저장을 누르면 다른 기기에서도 이어 쓸 수 있어요." + (currentPostPathInput.value && loadedVisibility === "public" ? " 이미 공개한 사진 주소와 글의 과거 기록·검색 캐시는 남을 수 있습니다." : "")
       : "발행하면 제목, 본문과 사진을 누구나 읽을 수 있습니다.";
     deleteButton.disabled = !currentPostPathInput.value;
+    document.getElementById("open-history").disabled = !currentPostPathInput.value || busy;
   }
   function updateConnectionState() {
     var authState = window.DiaryAuth ? window.DiaryAuth.getState() : { status: "guest" };
@@ -2209,7 +2216,7 @@
       coverInput.files.length ||
       galleryInput.files.length ||
       ((privateWorkspace || visibilityInput.value === "private") && hasUnstoredChanges()) ||
-      (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value)) ||
+      (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value + "\n" + savedGallery.join("\n"))) ||
       document.getElementById("profile-photo").files.length ||
       JSON.stringify(readProfile()) !== profileBaseline
     ) {
@@ -2434,6 +2441,16 @@
       }
     });
 
+  window.DiaryRecovery?.init({
+    info:ensureConnectionInfo,busy:function(){return busy;},setBusy:setBusy,
+    get:function(info,path){return getContentMeta(info.owner,info.repo,info.branch,path,info.token);},
+    put:function(info,path,sha,content,message){return putContent({owner:info.owner,repo:info.repo,branch:info.branch,token:info.token,path:path,expectedSha:sha,contentBase64:utf8ToBase64(content),message:message});},
+    remove:function(info,path,sha,message){return deleteContent({owner:info.owner,repo:info.repo,branch:info.branch,token:info.token,path:path,expectedSha:sha,message:message});},
+    commits:function(info,path,page){return githubFetch(API_BASE+"/repos/"+encodeURIComponent(info.owner)+"/"+encodeURIComponent(info.repo)+"/commits?sha="+encodeURIComponent(info.branch)+"&path="+encodeURIComponent(path)+"&per_page=20&page="+page,info.token);},
+    decode:base64ToUtf8,parse:parseMarkdown,id:newCloudDraftId,refresh:function(){return loadPostList(true);},status:function(text){setStatus(text,"status-success");},
+    context:function(){return {path:currentPostPathInput.value,sha:loadedSha,visibility:loadedVisibility};},
+    apply:function(markdown){var parsed=parseMarkdown(markdown);titleInput.value=parsed.data.title||"";bodyInput.value=parsed.body.replace(/^\n+/,"");loadedFrontMatter=parsed.frontMatter;coverUrlInput.value=parsed.data.cover||"";autoCoverInput.checked=parsed.data.cover_auto!=="false";coverPosition(parsed.data.cover_x??50,parsed.data.cover_y??50);if(parsed.data.date){var date=new Date(parsed.data.date);if(!Number.isNaN(date.getTime()))dateInput.value=formatDatetimeLocal(date);}savedGallery=[];galleryInput.value="";coverInput.value="";cloudDraftId=null;cloudDraftSha=null;cloudSnapshot="";updatePreview();saveDraft();showEditor(true);document.querySelector(".writing-sheet").scrollIntoView({block:"start",behavior:"smooth"});}
+  });
   if (saveConfigButton) saveConfigButton.addEventListener("click", connectWriter);
   tokenInput.addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); connectWriter(); }
@@ -2466,6 +2483,12 @@
   if (deleteButton) deleteButton.addEventListener("click", deleteCurrentPost);
   if (bodyInput) bodyInput.addEventListener("paste", handleBodyPaste);
 
+  document.getElementById("center-cover").addEventListener("click",function(){coverPosition(50,50);updatePreview();saveDraft();});
+  galleryInput.addEventListener("change",function(){
+    if(!galleryInput.files.length)return;
+    try { var files=Array.from(galleryInput.files);files.forEach(validateImage);files.forEach(function(file){savedGallery.push(window.DiaryPrivate.stage(file));});galleryInput.value="";updatePreview();saveDraft(); }
+    catch(error){setStatus(error.message,"status-error");}
+  });
   [
     titleInput,
     dateInput,
@@ -2473,6 +2496,7 @@
     bodyInput,
     coverInput,
     coverUrlInput,
+    coverXInput, coverYInput,
     autoCoverInput,
     galleryInput,
     appendGalleryInput,
@@ -2532,6 +2556,7 @@
       if (workspaceInitialized && hasChanges()) saveDraft();
       var authStatus = window.DiaryAuth && window.DiaryAuth.getState().status;
       if (authStatus !== "checking" && workspaceInitialized) {
+        window.DiaryRecovery?.clear();
         writerEpoch++; libraryVersion++; libraryLoaded = false; libraryDrafts = []; publicTitleCache.clear();
         if (privateWorkspace || visibilityInput.value === "private" || loadedVisibility === "private") {
           try { sessionStorage.removeItem(draftKey() + ":private"); } catch (_) {}

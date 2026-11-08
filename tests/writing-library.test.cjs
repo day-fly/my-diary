@@ -18,7 +18,7 @@ test('private cloud drafts retain cover and gallery photos across two devices wi
   const data=JSON.parse(entries[0][1].buffer.toString());assert.match(data.cover,/^diary-private:/);assert.equal(data.galleryRefs.length,1);assert.doesNotMatch(JSON.stringify(data),/test-private-token/);
   assert.equal(a.el('cover-image').files.length,0);assert.equal(a.el('gallery-images').files.length,0);assert.equal(a.w.localStorage.getItem(key),null);
   const b=setup({stores:a});await flush();await openDraft(b,'이어 쓸 기록');assert.equal(b.el('post-title').value,'이어 쓸 기록');assert.equal(b.el('post-body').value,'보관할 문장');
-  assert.match(b.el('preview-cover').querySelector('img').src,/^blob:/);assert.equal(b.el('saved-draft-photos').querySelectorAll('img').length,1);assert.match(b.el('preview-gallery').querySelector('img').src,/^blob:/);
+  assert.match(b.el('preview-cover').querySelector('img').src,/^blob:/);assert.equal(b.el('photo-editor').querySelectorAll('img').length,1);assert.match(b.el('preview-gallery').querySelector('img').src,/^blob:/);
   assert.equal(b.w.localStorage.getItem(key),null);assert.equal(a.publicFiles.get(path).buffer.toString(),original);a.close();b.close();
 });
 test('multiple drafts, title search and status filters keep every saved draft accessible',async()=>{
