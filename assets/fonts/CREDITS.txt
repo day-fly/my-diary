@@ -1,0 +1,17 @@
+마루 부리 (MaruBuri)
+Copyright: NAVER Corporation / NAVER Cultural Foundation
+License: SIL Open Font License 1.1; full notice in maruburi/LICENSE.txt
+Official page: https://hangeul.naver.com/font
+Official font stylesheet: https://hangeul.naver.com/css/fonts.css?5
+Unmodified WOFF2 files downloaded on 2026-11-08:
+https://hangeul.pstatic.net/0/hangeul/2023/fonts/MaruBuri-Regular.woff2
+https://hangeul.pstatic.net/0/hangeul/2023/fonts/MaruBuri-SemiBold.woff2
+https://hangeul.pstatic.net/0/hangeul/2023/fonts/MaruBuri-Bold.woff2
+
+Pretendard Variable v1.3.9
+Copyright (c) 2021 Kil Hyung-jin, with Reserved Font Name Pretendard.
+License: SIL Open Font License 1.1
+Official project: https://github.com/orioncactus/pretendard
+Full license: https://github.com/orioncactus/pretendard/blob/v1.3.9/LICENSE
+Loaded from the official version-pinned dynamic subset stylesheet:
+https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css
