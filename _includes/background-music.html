@@ -1,12 +1,25 @@
-<aside class="music-player" aria-label="배경음악" hidden>
+{% assign first_track = site.data.music | first %}
+<aside class="music-player" aria-label="배경음악" data-base="{{ '/' | relative_url }}" hidden>
   <div class="music-panel" id="music-panel" hidden>
     <p class="eyebrow">문장 곁의 음악</p>
-    <p class="music-track">Touching Moments One · Pulse</p>
-    <p class="music-credit"><a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100039" target="_blank" rel="noopener noreferrer">Kevin MacLeod · 곡 정보 ↗</a></p>
-    <button class="music-panel-toggle btn-light" type="button" data-music-toggle aria-label="배경음악 재생" aria-pressed="false">음악 재생</button>
+    <p class="music-track" aria-live="polite">{{ first_track.title | escape }}</p>
+    <p class="music-description">{{ first_track.description | escape }}</p>
+    <p class="music-credit"><a href="https://incompetech.com/music/royalty-free/index.html?isrc={{ first_track.isrc }}" target="_blank" rel="noopener noreferrer">{{ first_track.artist | escape }} · 곡 정보 ↗</a></p>
+    <div class="music-transport" role="group" aria-label="곡 재생 조절">
+      <button class="music-previous btn-light" type="button" aria-label="이전 곡" title="이전 곡"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12M15 4l-8 6 8 6Z"/></svg></button>
+      <button class="music-panel-toggle btn-light" type="button" data-music-toggle aria-label="배경음악 재생" aria-pressed="false">음악 재생</button>
+      <button class="music-next btn-light" type="button" aria-label="다음 곡" title="다음 곡"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4v12M5 4l8 6-8 6Z"/></svg></button>
+    </div>
+    <div class="music-collection">
+      <label for="music-track-select">곡 고르기 <span class="music-count">{{ site.data.music.size }}곡</span></label>
+      <select id="music-track-select">
+        {% for track in site.data.music %}<option value="{{ track.id | escape }}" data-src="{{ track.src | relative_url }}" data-title="{{ track.title | escape }}" data-description="{{ track.description | escape }}" data-artist="{{ track.artist | escape }}" data-credit="https://incompetech.com/music/royalty-free/index.html?isrc={{ track.isrc }}">{{ track.title | escape }}</option>{% endfor %}
+      </select>
+      <button class="music-shuffle" type="button" aria-pressed="true">섞어 듣기 켜짐</button>
+    </div>
     <label class="music-volume" for="music-volume">소리 크기 <output id="music-volume-value" for="music-volume">20%</output></label>
     <input id="music-volume" type="range" min="0" max="100" step="5" value="20" aria-describedby="music-help" />
-    <p class="music-help" id="music-help">음악을 끄거나 소리 크기를 바꾸면 다음 방문에도 기억해요. 휴대폰에서는 기기의 음량 버튼도 이용하세요.</p>
+    <p class="music-help" id="music-help">한 곡이 끝나면 다음 곡으로 이어집니다. 듣던 곡과 위치, 소리 설정을 기억해요.</p>
     <a class="music-license" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0 · 원곡 그대로 사용</a>
     <div><button class="effects-toggle" type="button" data-season-effects-toggle aria-pressed="true" hidden>계절 효과 끄기</button></div>
   </div>
@@ -18,6 +31,6 @@
     <button class="music-details" type="button" aria-label="음악 정보와 소리 크기" aria-expanded="false" aria-controls="music-panel"><svg class="music-expand-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m5 12 5-5 5 5"/></svg><svg class="music-compact-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M8 14V5l8-2v9M8 8l8-2"/><ellipse cx="5" cy="14.5" rx="3" ry="2.5"/><ellipse cx="13" cy="12.5" rx="3" ry="2.5"/></svg></button>
   </div>
   <p class="music-message" role="status" hidden></p>
-  <audio id="background-audio" preload="none" loop data-src="{{ '/assets/audio/touching-moments-one-pulse.mp3' | relative_url }}"></audio>
+  <audio id="background-audio" preload="none" data-src="{{ '/assets/audio/touching-moments-one-pulse.mp3' | relative_url }}"></audio>
 </aside>
 <script src="{{ '/assets/js/background-music.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
