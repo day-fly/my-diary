@@ -632,12 +632,12 @@ h1 {
   color: var(--ink-soft);
 }
 .about-page {
-  max-width: 680px;
-  margin: 72px auto 0;
+  max-width: 960px;
+  margin: 55px auto 0;
   text-align: center;
 }
 .about-page .eyebrow {
-  margin-bottom: 32px;
+  margin-bottom: 18px;
 }
 .profile-avatar-large {
   width: 112px;
@@ -653,11 +653,52 @@ h1 {
   font-family: var(--serif);
   font-size: 17px;
 }
+.about-quote {
+  margin: 0;
+}
+.about-quote p {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.7;
+  text-wrap: balance;
+}
+.about-quote cite {
+  font-size: 12px;
+  font-style: normal;
+  color: var(--ink-soft);
+}
+.about-quote a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.about-story {
+  margin: 40px 0 32px;
+}
+.about-story-illustrated {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 44px;
+  text-align: left;
+}
+.about-illustration {
+  margin: 0;
+  min-width: 0;
+}
+.about-illustration img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
 .about-bio {
   font-family: var(--serif);
   line-height: 2.2;
   color: var(--ink-soft);
-  margin: 36px 0 32px;
+  margin: 0;
+  word-break: keep-all;
   overflow-wrap: anywhere;
 }
 .about-bottom {
@@ -1181,13 +1222,21 @@ h1 {
     gap: 20px;
   }
   .about-page {
-    margin-top: 45px;
+    margin-top: 38px;
   }
   .about-page h1 {
     font-size: 34px;
+    margin-top: 18px;
   }
   .about-tagline {
     font-size: 15px;
+  }
+  .about-quote p {
+    font-size: 20px;
+  }
+  .about-story-illustrated {
+    grid-template-columns: 1fr;
+    gap: 28px;
   }
   .about-bio {
     font-size: 14px;
