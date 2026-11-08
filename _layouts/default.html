@@ -7,13 +7,14 @@
     <meta name="description" content="{{ page.excerpt | default: site.description | strip_html | normalize_whitespace | escape }}" />
     <meta name="theme-color" content="#f7f6f2" />
     <script src="{{ '/assets/js/seasons.js' | relative_url }}"></script>
+    <script src="{{ '/assets/js/author-auth.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
     <title>{% if page.title %}{{ page.title | escape }} · {% endif %}{{ site.title | escape }}</title>
     <link rel="preload" href="{{ '/assets/fonts/maruburi/MaruBuri-Regular.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" crossorigin />
     <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}?v={{ site.time | date: '%s' }}" />
   </head>
-  <body{% if page.permalink == '/write/' %} class="is-writer"{% endif %}>
+  <body data-writer-owner="{{ site.writer.owner | escape }}" data-writer-repo="{{ site.writer.repo | escape }}" data-writer-branch="{{ site.writer.branch | escape }}"{% if page.permalink == '/write/' %} class="is-writer"{% endif %}>
     {% include season-effects.html %}
     <a class="skip-link" href="#main">본문으로 건너뛰기</a>
     <header class="site-header">
@@ -21,11 +22,12 @@
       <nav class="site-nav" aria-label="주 메뉴">
         <a href="{{ '/' | relative_url }}"{% if page.url == '/' or page.url == '/archive/' %} aria-current="page"{% endif %}>기록</a>
         <a href="{{ '/about/' | relative_url }}"{% if page.url == '/about/' %} aria-current="page"{% endif %}>소개</a>
-        <a class="nav-write" href="{{ '/write/' | relative_url }}"{% if page.url == '/write/' %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> 글쓰기</a>
+        <a href="{{ '/write/#connection' | relative_url }}" data-guest-only{% if page.url == '/write/' %} aria-current="page"{% endif %}>로그인</a>
+        <a class="nav-write" href="{{ '/write/' | relative_url }}" data-author-only hidden{% if page.url == '/write/' %} aria-current="page"{% endif %}><span aria-hidden="true">＋</span> 글쓰기</a>
       </nav>
     </header>
     <main id="main" class="page-wrap" tabindex="-1">{{ content }}</main>
-    <footer class="site-footer"><span>© {{ 'now' | date: '%Y' }} {{ site.title }}</span><span>시와 에세이, 그리고 지나가는 날들.</span><button class="effects-toggle" type="button" data-season-effects-toggle aria-pressed="true" hidden>계절 효과 끄기</button></footer>
+    <footer class="site-footer"><span>© {{ 'now' | date: '%Y' }} {{ site.title }}</span><span>시와 에세이, 그리고 지나가는 날들.</span><button class="effects-toggle" type="button" data-season-effects-toggle aria-pressed="true" hidden>계절 효과 끄기</button><button class="effects-toggle" type="button" data-author-only data-author-logout hidden>로그아웃</button></footer>
     {% include background-music.html %}
   </body>
 </html>

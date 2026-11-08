@@ -44,6 +44,15 @@ function setup({
   w.HTMLElement.prototype.scrollIntoView = () => {};
   w.URL.createObjectURL = () => "blob:test";
   w.URL.revokeObjectURL = () => {};
+  // These writer unit tests start with a verified author. Real authentication
+  // and unauthenticated writer access are covered in author-auth.test.cjs.
+  w.DiaryAuth = {
+    ready: Promise.resolve(true),
+    getState: () => ({ status: "authenticated", login: "day-fly" }),
+    getConnection: () => ({ owner: "day-fly", repo: "my-diary", branch: "main", token: "test-only-token" }),
+    isAuthorized: info => info.owner === "day-fly" && info.repo === "my-diary" && info.token === "test-only-token",
+    logout: () => {},
+  };
   const writes = [];
   let remoteProfile = profile,
     remotePost = post,
@@ -290,6 +299,7 @@ test("a new post validates content and future dates before any repository write"
   await flush();
   a.input("post-title", "아직 로그인 전");
   a.input("post-body", "임시로 남기는 글");
+  a.input("gh-token", "");
   a.d.getElementById("publish-post").click();
   await flush();
   assert.equal(a.writes.length, 0);
@@ -317,6 +327,27 @@ test("canceling new draft keeps the existing text", async () => {
   a.w.confirm = () => false;
   a.d.getElementById("new-draft").click();
   assert.equal(a.d.getElementById("post-body").value, "보존할 내용");
+  a.w.close();
+});
+
+test("logging out during publication stops subsequent repository writes and keeps the draft", async () => {
+  const a = setup();
+  await flush();
+  a.input("post-title", "보존할 글");
+  a.input("post-body", "로그아웃 뒤에는 발행하지 않습니다.");
+  a.input("post-date", "2026-01-01T12:00");
+  const originalFetch = a.w.fetch;
+  a.w.fetch = async (url, options = {}) => {
+    const result = await originalFetch(url, options);
+    if (url.includes("/contents/_posts/") && options.method !== "PUT")
+      a.w.DiaryAuth.isAuthorized = () => false;
+    return result;
+  };
+  a.d.getElementById("publish-post").click();
+  await flush();
+  assert.equal(a.writes.length, 0);
+  assert.match(a.d.getElementById("writer-status").textContent, /로그인이 해제/);
+  assert.equal(JSON.parse(a.w.localStorage.getItem(a.key)).title, "보존할 글");
   a.w.close();
 });
 

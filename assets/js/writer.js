@@ -11,6 +11,7 @@
   var busy = false;
   var publishedSnapshot = "";
   var disabledBefore = [];
+  var workspaceInitialized = false;
 
   var siteTitleLink = document.querySelector(".site-title");
   var siteBase = "";
@@ -632,7 +633,8 @@
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return {};
-      return JSON.parse(raw);
+      var config = JSON.parse(raw);
+      return config && typeof config === "object" && !Array.isArray(config) ? config : {};
     } catch (error) {
       return {};
     }
@@ -640,11 +642,10 @@
 
   function loadConfig() {
     var config = getStoredConfig();
-    ownerInput.value =
-      config.owner || document.querySelector(".writer-page").dataset.owner;
-    repoInput.value =
-      config.repo || document.querySelector(".writer-page").dataset.repo;
-    branchInput.value = config.branch || "main";
+    var defaults = document.querySelector(".writer-page").dataset;
+    ownerInput.value = defaults.owner;
+    repoInput.value = defaults.repo;
+    branchInput.value = defaults.branch || "main";
     if (oauthClientIdInput)
       oauthClientIdInput.value = config.oauthClientId || "";
     if (oauthProxyUrlInput)
@@ -661,13 +662,9 @@
       )
         tokenInput.value = session.token;
     } catch (_) {}
-    if (config.token) {
+    if (config.token && config.owner === ownerInput.value && config.repo === repoInput.value && (config.branch || "main") === branchInput.value) {
       tokenInput.value = config.token;
       rememberTokenInput.checked = true;
-      setOAuthStatus(
-        "저장된 토큰이 있습니다. 바로 발행할 수 있습니다.",
-        "status-success",
-      );
     }
   }
 
@@ -681,7 +678,8 @@
         ? normalizeUrl(oauthProxyUrlInput.value)
         : "",
     };
-    if (rememberTokenInput.checked && tokenInput.value.trim()) {
+    var verified = window.DiaryAuth && window.DiaryAuth.isAuthorized({ owner: config.owner, repo: config.repo, branch: config.branch, token: tokenInput.value.trim() });
+    if (rememberTokenInput.checked && verified) {
       config.token = tokenInput.value.trim();
     }
     try {
@@ -692,7 +690,7 @@
           owner: config.owner,
           repo: config.repo,
           branch: config.branch,
-          token: tokenInput.value.trim(),
+          token: verified ? tokenInput.value.trim() : "",
         }),
       );
       updateConnectionState();
@@ -822,6 +820,9 @@
 
   async function githubFetch(url, token, options) {
     var finalOptions = options || {};
+    if ((finalOptions.method === "PUT" || finalOptions.method === "DELETE") &&
+        (!window.DiaryAuth || !window.DiaryAuth.isAuthorized({ owner: ownerInput.value, repo: repoInput.value, branch: branchInput.value, token: token })))
+      throw new Error("로그인이 해제되어 저장을 중단했어요. 다시 로그인해 주세요.");
     var headers = { Accept: "application/vnd.github+json" };
     if (token) headers.Authorization = "Bearer " + token;
     if (finalOptions.headers) Object.assign(headers, finalOptions.headers);
@@ -847,6 +848,7 @@
     }
 
     if (!response.ok) {
+      if (response.status === 401 && window.DiaryAuth) window.DiaryAuth.logout();
       var detail =
         payload && payload.message
           ? payload.message
@@ -892,6 +894,7 @@
     });
 
     if (response.status === 404) return null;
+    if (response.status === 401 && window.DiaryAuth) window.DiaryAuth.logout();
 
     var payload = await response.json();
     if (!response.ok) throw new Error(payload.message || "파일 확인 실패");
@@ -1110,11 +1113,12 @@
     var repo = repoInput.value.trim();
     var branch = branchInput.value.trim() || "main";
     var token = tokenInput.value.trim();
-    if (!owner || !repo || !token) {
+    var info = { owner: owner, repo: repo, branch: branch, token: token };
+    if (!window.DiaryAuth || !window.DiaryAuth.isAuthorized(info)) {
       document.getElementById("connection").open = true;
       return null;
     }
-    return { owner: owner, repo: repo, branch: branch, token: token };
+    return info;
   }
 
   function resetDraftMode() {
@@ -1138,21 +1142,23 @@
     setStatus("새 페이지를 열었습니다.", "status-info");
   }
 
-  async function fillOwnerFromUser(token) {
+  async function connectWriter() {
+    if (!window.DiaryAuth) {
+      setOAuthStatus("로그인 기능을 불러오지 못했어요. 페이지를 새로고침해 주세요.", "status-error");
+      return;
+    }
+    saveConfigButton.disabled = true;
+    saveConfigButton.textContent = "확인 중…";
     try {
-      var me = await githubFetch(API_BASE + "/user", token, { method: "GET" });
-      if (!ownerInput.value.trim() && me && me.login)
-        ownerInput.value = me.login;
-      if (me && me.login) {
-        setOAuthStatus("OAuth 연결됨: @" + me.login, "status-success");
-      } else {
-        setOAuthStatus("OAuth 연결됨", "status-success");
+      if (await window.DiaryAuth.login(tokenInput.value, { remember: rememberTokenInput.checked })) {
+        saveConfig();
+        setOAuthStatus("", "status-info");
+        if (window.location.hash === "#profile") document.getElementById("profile").scrollIntoView({ block: "start" });
+        else titleInput.focus();
       }
-    } catch (_error) {
-      setOAuthStatus(
-        "토큰은 저장됐지만 사용자 확인에 실패했습니다.",
-        "status-info",
-      );
+    } finally {
+      saveConfigButton.disabled = false;
+      saveConfigButton.textContent = "로그인";
     }
   }
 
@@ -1166,6 +1172,12 @@
         "OAuth Client ID와 OAuth Proxy URL을 먼저 입력하세요.",
         "status-error",
       );
+      return;
+    }
+    try {
+      if (new URL(proxyUrl).protocol !== "https:") throw new Error("https required");
+    } catch (_) {
+      setOAuthStatus("간편 로그인 연결 주소는 https://로 시작하는 올바른 주소여야 해요.", "status-error");
       return;
     }
     if (!window.crypto || !window.crypto.subtle) {
@@ -1192,6 +1204,7 @@
           createdAt: Date.now(),
           clientId: clientId,
           proxyUrl: proxyUrl,
+          returnTo: window.location.pathname + window.location.search + window.location.hash,
         }),
       );
 
@@ -1205,7 +1218,7 @@
       var params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri(),
-        scope: "repo",
+        scope: "public_repo",
         state: state,
         code_challenge: challenge,
         code_challenge_method: "S256",
@@ -1222,8 +1235,8 @@
   }
 
   function clearOAuthSession() {
-    sessionStorage.removeItem(OAUTH_PENDING_KEY);
-    setOAuthStatus("OAuth 연결 해제됨", "status-info");
+    try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch (_) {}
+    setOAuthStatus("", "status-info");
   }
 
   async function finishOAuthIfReturned() {
@@ -1242,7 +1255,8 @@
       return;
     }
 
-    var pendingRaw = sessionStorage.getItem(OAUTH_PENDING_KEY);
+    var pendingRaw;
+    try { pendingRaw = sessionStorage.getItem(OAUTH_PENDING_KEY); } catch (_) {}
     if (!pendingRaw) {
       setOAuthStatus(
         "OAuth 세션 정보가 없어 토큰 교환을 중단했습니다.",
@@ -1265,8 +1279,8 @@
     }
 
     var state = params.get("state") || "";
-    if (state !== pending.state) {
-      setOAuthStatus("OAuth state 검증에 실패했습니다.", "status-error");
+    if (!state || state !== pending.state || !Number.isFinite(pending.createdAt) || Date.now() - pending.createdAt > 600000 || pending.createdAt > Date.now()) {
+      setOAuthStatus("로그인 요청이 만료되었거나 일치하지 않아요. 다시 로그인해 주세요.", "status-error");
       clearOAuthParamsFromUrl();
       sessionStorage.removeItem(OAUTH_PENDING_KEY);
       return;
@@ -1296,9 +1310,15 @@
       });
 
       tokenInput.value = exchanged.access_token;
-      await fillOwnerFromUser(exchanged.access_token);
-      saveConfig();
-      updateConnectionState();
+      if (pending.returnTo) {
+        var returnUrl = new URL(pending.returnTo, window.location.origin);
+        if (returnUrl.origin === window.location.origin && returnUrl.pathname === window.location.pathname)
+          window.history.replaceState({}, document.title, returnUrl.pathname + returnUrl.search + returnUrl.hash);
+      }
+      if (window.DiaryAuth && await window.DiaryAuth.login(exchanged.access_token, { remember: rememberTokenInput.checked })) {
+        saveConfig();
+        setOAuthStatus("", "status-info");
+      } else setOAuthStatus("작성자 계정을 확인하지 못했어요. 위의 로그인 안내를 확인해 주세요.", "status-error");
 
       sessionStorage.removeItem(OAUTH_PENDING_KEY);
       clearOAuthParamsFromUrl();
@@ -1519,7 +1539,7 @@
     var info = ensureConnectionInfo();
     if (!info) {
       setStatus(
-        "위의 ‘발행 계정 연결’을 열어 로그인해 주세요. 글은 임시저장되어 있습니다.",
+        "위의 ‘작성자 계정’에서 로그인해 주세요.",
         "status-error",
       );
       return;
@@ -1753,6 +1773,7 @@
     );
   }
   function saveDraft() {
+    if (!workspaceInitialized) return;
     try {
       localStorage.setItem(draftKey(), JSON.stringify(draftData()));
       draftSaved = true;
@@ -1807,10 +1828,10 @@
     deleteButton.disabled = !currentPostPathInput.value;
   }
   function updateConnectionState() {
+    var authState = window.DiaryAuth ? window.DiaryAuth.getState() : { status: "guest" };
     document.getElementById("connection-state").textContent =
-      tokenInput.value.trim()
-        ? "연결 정보 준비됨"
-        : "로그인 후 발행할 수 있어요";
+      authState.status === "authenticated" ? "@" + authState.login + " 로그인됨" : authState.status === "checking" ? "계정 확인 중…" : "로그인이 필요해요";
+    document.getElementById("oauth-ready-action").hidden = !(oauthClientIdInput.value.trim() && oauthProxyUrlInput.value.trim());
   }
   function setBusy(value) {
     if (value && !busy) {
@@ -2139,20 +2160,20 @@
       }
     });
 
-  if (saveConfigButton) {
-    saveConfigButton.addEventListener("click", function () {
-      if (saveConfig())
-        setStatus("연결 정보를 저장했습니다.", "status-success");
-    });
-  }
+  if (saveConfigButton) saveConfigButton.addEventListener("click", connectWriter);
+  tokenInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") { event.preventDefault(); connectWriter(); }
+  });
+  [oauthClientIdInput, oauthProxyUrlInput].forEach(function (input) { input.addEventListener("input", updateConnectionState); });
 
   if (oauthLoginButton)
     oauthLoginButton.addEventListener("click", beginOAuthLogin);
   if (oauthLogoutButton) {
     oauthLogoutButton.addEventListener("click", function () {
+      if (workspaceInitialized) saveDraft();
       tokenInput.value = "";
       clearOAuthSession();
-      saveConfig();
+      if (window.DiaryAuth) window.DiaryAuth.logout();
     });
   }
 
@@ -2194,14 +2215,31 @@
   publishButton.addEventListener("click", publishPost);
 
   loadConfig();
-  if (!dateInput.value) dateInput.value = formatDatetimeLocal(new Date());
-  restoreDraft();
-  updatePreview();
-  updateMode();
   updateConnectionState();
-  renderProfilePreview();
-  if (window.location.hash === "#profile")
-    document.getElementById("profile").open = true;
-  preparePostIndex();
-  finishOAuthIfReturned();
+  function handleAuthorState() {
+    var info = window.DiaryAuth && window.DiaryAuth.getConnection();
+    if (info) {
+      tokenInput.value = info.token;
+      if (!workspaceInitialized) {
+        workspaceInitialized = true;
+        if (!dateInput.value) dateInput.value = formatDatetimeLocal(new Date());
+        restoreDraft();
+        updatePreview();
+        updateMode();
+        renderProfilePreview();
+        if (window.location.hash === "#profile") document.getElementById("profile").open = true;
+        preparePostIndex();
+      }
+      document.getElementById("connection").open = false;
+    } else {
+      if (workspaceInitialized && hasChanges()) saveDraft();
+      document.getElementById("connection").open = true;
+      if (window.DiaryAuth && window.DiaryAuth.getState().status === "guest") tokenInput.value = "";
+    }
+    updateConnectionState();
+  }
+  window.addEventListener("diary:auth", handleAuthorState);
+  if (window.DiaryAuth) {
+    window.DiaryAuth.ready.then(function () { handleAuthorState(); finishOAuthIfReturned(); });
+  }
 })();

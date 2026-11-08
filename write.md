@@ -4,22 +4,26 @@ title: "글쓰기"
 permalink: /write/
 ---
 
-<div class="writer-page" data-owner="day-fly" data-repo="my-diary" data-branch="main">
-  <header class="writer-heading"><div><p class="eyebrow">YOUR WRITING ROOM</p><h1>한 편의 기록</h1></div><a class="text-link" href="{{ '/' | relative_url }}">기록으로 돌아가기 ↗</a></header>
-  <div class="writer-actionbar"><div><span id="draft-status" role="status">이 브라우저에 자동 임시저장</span><span id="word-count" class="muted">0자</span></div><div class="writer-main-actions"><button id="new-draft" type="button" class="btn-light">새 글</button><button id="save-draft" type="button" class="btn-light">임시저장</button><button id="publish-post" type="button" class="btn-strong">발행하기 <span aria-hidden="true">↗</span></button></div></div>
+<div class="writer-page" data-owner="{{ site.writer.owner | escape }}" data-repo="{{ site.writer.repo | escape }}" data-branch="{{ site.writer.branch | escape }}">
+  <header class="writer-heading"><div><p class="eyebrow">YOUR WRITING ROOM</p><h1><span data-guest-only>작성자 로그인</span><span data-author-only hidden>한 편의 기록</span></h1></div><a class="text-link" href="{{ '/' | relative_url }}">기록으로 돌아가기 ↗</a></header>
+  <p class="writer-login-help" data-guest-only>하루살이의 글을 쓰고 다듬는 공간입니다.<br />작성자 계정으로 로그인하면 글쓰기와 수정 메뉴가 열립니다.</p>
+  <noscript><p class="writer-help">로그인하려면 브라우저의 자바스크립트를 켜 주세요.</p></noscript>
   <p id="writer-status" class="writer-status" role="status" aria-live="polite"></p>
-  <details class="writer-panel writer-connection-panel" id="connection">
-    <summary><span>발행 계정 연결</span><span class="summary-note" id="connection-state">로그인 후 발행할 수 있어요</span></summary>
-    <p class="writer-help">글은 로그인 전에도 쓸 수 있어요. 처음 한 번 연결하면 이 브라우저에서 설정을 기억합니다.</p>
-    <div class="writer-fields writer-fields-two"><label>OAuth Client ID<input id="oauth-client-id" type="text" placeholder="GitHub OAuth App의 Client ID" autocomplete="off" /></label><label>OAuth Proxy URL<input id="oauth-proxy-url" type="url" placeholder="https://your-worker.workers.dev" autocomplete="off" /></label></div>
-    <div class="writer-inline"><button id="oauth-login" type="button" class="btn-strong">GitHub로 로그인</button><button id="oauth-logout" type="button" class="btn-light">로그아웃</button></div>
-    <p id="oauth-status" class="writer-status" aria-live="polite">발행 계정을 연결해 주세요.</p>
-    <details class="advanced-settings"><summary>고급 연결 설정 / 토큰으로 연결</summary>
-      <div class="writer-fields writer-fields-three"><label>저장소 소유자<input id="gh-owner" type="text" autocomplete="off" /></label><label>저장소 이름<input id="gh-repo" type="text" autocomplete="off" /></label><label>브랜치<input id="gh-branch" type="text" value="main" autocomplete="off" /></label></div>
-      <div class="writer-fields"><label>GitHub 토큰<input id="gh-token" type="password" placeholder="Contents 읽기·쓰기 권한이 있는 토큰" autocomplete="off" /></label><label class="writer-check"><input id="remember-token" type="checkbox" /> 이 기기에 로그인 정보 기억하기 (개인 기기에서만)</label></div>
+  <details class="writer-panel writer-connection-panel" id="connection" open>
+    <summary><span>작성자 계정</span><span class="summary-note" id="connection-state">로그인이 필요해요</span></summary>
+    <p id="author-status" class="writer-status" role="status" data-author-status>작성자 계정으로 로그인해 주세요.</p>
+    <div class="writer-fields"><label>GitHub 로그인 키<input id="gh-token" type="password" placeholder="기존 발행에 사용하던 GitHub 토큰" autocomplete="off" spellcheck="false" /><span class="writer-tip">@{{ site.writer.owner }} 계정의 이 블로그 발행용 토큰을 사용하세요.</span></label><label class="writer-check"><input id="remember-token" type="checkbox" /> 이 기기에 로그인 정보 기억하기 (개인 기기에서만)</label></div>
+    <div class="writer-inline"><button id="save-config" type="button" class="btn-strong">로그인</button><button id="oauth-logout" type="button" class="btn-light" data-author-only hidden>로그아웃</button></div>
+    <input id="gh-owner" type="hidden" /><input id="gh-repo" type="hidden" /><input id="gh-branch" type="hidden" />
+    <div id="oauth-ready-action" class="writer-inline" hidden><button id="oauth-login" type="button" class="btn-light">GitHub로 로그인</button></div>
+    <details class="advanced-settings"><summary>GitHub 간편 로그인 설정</summary>
+      <p class="writer-help">GitHub 간편 로그인을 연결해 둔 경우에만 입력하세요.</p>
+      <div class="writer-fields writer-fields-two"><label>OAuth Client ID<input id="oauth-client-id" type="text" placeholder="GitHub OAuth App의 Client ID" autocomplete="off" /></label><label>OAuth Proxy URL<input id="oauth-proxy-url" type="url" placeholder="https://your-worker.workers.dev" autocomplete="off" /></label></div>
     </details>
-    <button id="save-config" type="button" class="btn-light">연결 정보 저장</button>
+    <p id="oauth-status" class="writer-status" aria-live="polite"></p>
   </details>
+  <div class="writer-workspace" data-author-only hidden>
+  <div class="writer-actionbar"><div><span id="draft-status" role="status">이 브라우저에 자동 임시저장</span><span id="word-count" class="muted">0자</span></div><div class="writer-main-actions"><button id="new-draft" type="button" class="btn-light">새 글</button><button id="save-draft" type="button" class="btn-light">임시저장</button><button id="publish-post" type="button" class="btn-strong">발행하기 <span aria-hidden="true">↗</span></button></div></div>
   <section class="writer-panel writing-sheet">
     <div class="editor-tabs" role="group" aria-label="편집 화면"><button id="show-editor" type="button" aria-pressed="true" aria-controls="editor-pane">작성</button><button id="show-preview" type="button" aria-pressed="false" aria-controls="preview-pane">미리보기</button></div>
     <div id="editor-pane">
@@ -33,6 +37,7 @@ permalink: /write/
   </section>
   <details class="writer-panel writer-manage-panel" id="manage"><summary>기존 글 수정 <span class="summary-note">발행한 기록 불러오기</span></summary><p class="writer-help">글을 불러와 수정한 뒤 ‘수정 발행’을 누르세요.</p><div class="writer-fields"><label>발행한 글<select id="post-list"><option value="">목록 새로고침을 눌러주세요</option></select></label><input id="current-post-path" type="hidden" /></div><div class="writer-inline"><button id="load-posts" type="button" class="btn-light">목록 새로고침</button><button id="load-selected-post" type="button" class="btn-light">선택 글 불러오기</button><button id="delete-post" type="button" class="btn-danger" disabled>현재 글 삭제</button></div></details>
   <details class="writer-panel" id="profile"><summary>내 프로필 <span class="summary-note">사진 · 이름 · 소개</span></summary><p class="writer-help">저장하면 홈과 소개 페이지에 공개됩니다.</p><div class="profile-editor-preview"><span id="profile-avatar-preview" class="profile-avatar"></span><div><strong id="profile-name-preview"></strong><p id="profile-tagline-preview" class="muted"></p></div></div><div class="writer-fields writer-fields-two"><label>표시 이름<input id="profile-name" type="text" maxlength="60" value="{{ site.data.profile.name | escape }}" /></label><label>한 줄 소개<input id="profile-tagline" type="text" maxlength="120" value="{{ site.data.profile.tagline | escape }}" placeholder="나를 소개하는 짧은 한 문장" /></label></div><div class="writer-fields"><label>자기소개<textarea id="profile-bio" rows="5" maxlength="3000" placeholder="어떤 마음으로 글을 쓰고 있나요?">{{ site.data.profile.bio | escape }}</textarea></label></div><div class="writer-fields writer-fields-two"><label>프로필 사진<input id="profile-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" /></label><label>웹사이트<input id="profile-website" type="url" value="{{ site.data.profile.website | escape }}" placeholder="https://" /></label></div><input id="profile-avatar" type="hidden" value="{{ site.data.profile.avatar | escape }}" /><div class="writer-inline"><button id="remove-profile-photo" class="btn-light" type="button">사진 지우기</button><button id="load-profile" class="btn-light" type="button">저장된 프로필 불러오기</button><button id="save-profile" class="btn-strong" type="button">프로필 저장</button></div><p id="profile-status" class="writer-status" role="status"></p></details>
+</div>
 </div>
 <script src="{{ '/assets/js/cover-image.js' | relative_url }}" defer></script>
 <script src="{{ '/assets/js/writer.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
