@@ -1981,3 +1981,25 @@ html[data-season="winter"] .season-particle::after { display: none; }
   .publication-steps { font-size: 11px; gap: 6px; }
   .publication-steps li + li::before { margin-right: 6px; }
 }
+
+/* Photo ordering, focal points, and recovery keep all actions usable by touch. */
+.photo-editor h3 { font: 500 14px/1.6 var(--sans); margin: 24px 0 12px; }
+.photo-edit-list { display: grid; gap: 12px; }
+.photo-edit-item { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+.photo-edit-item[draggable="true"] { cursor: grab; }
+.photo-edit-item img { width: 90px; height: 76px; object-fit: cover; border-radius: 4px; }
+.photo-edit-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.photo-edit-actions button { min-height: 44px; padding: 8px 12px; font: 12px/1.5 var(--sans); }
+.cover-position-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin: 20px 0; }
+.cover-position-controls label { flex: 1; min-width: 140px; font: 12px/1.6 var(--sans); }
+.cover-position-controls input { display: block; width: 100%; padding: 0; height: 44px; }
+.recovery-panel[hidden], .photo-editor[hidden], #recovery-preview[hidden] { display: none; }
+.recovery-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); font: 13px/1.6 var(--sans); }
+.recovery-row div { min-width: 0; overflow-wrap: anywhere; }
+.recovery-row small { display: block; color: var(--ink-soft); margin-top: 5px; }
+.recovery-row button { flex-shrink: 0; min-height: 44px; }
+#recovery-preview { margin-top: 24px; }
+#recovery-preview label { display: block; font: 13px/1.6 var(--sans); }
+#recovery-text { width: 100%; box-sizing: border-box; margin: 10px 0 16px; padding: 16px; font: 16px/1.9 var(--serif); border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+.music-stop-all { min-height: 40px; width: 100%; margin: 10px 0; background: none; border: 1px solid var(--line); border-radius: 5px; color: var(--ink-soft); font: 12px/1.5 var(--sans); cursor: pointer; }
+@media(max-width:760px) { .photo-edit-item { align-items: flex-start; } .photo-edit-actions { flex:1; } .photo-edit-actions button { flex:1 0 40%; } }

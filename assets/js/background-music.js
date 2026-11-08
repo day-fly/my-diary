@@ -90,7 +90,10 @@
     panelToggle.textContent = playing ? "음악 일시정지" : state === "loading" ? "불러오기 취소" : "음악 재생";
   }
   function showMessage(text) { message.textContent = text; message.hidden = !text; }
+  const coordinator = window.DiaryMusicCoordinator;
+  coordinator?.onStop(reason => { if (reason === "pause") enabled = false; stop(); help.textContent = reason === "pause" ? "다른 탭에서도 음악을 멈췄어요." : "다른 탭에서 음악을 듣고 있어요. 이곳에서 재생하면 이어받습니다."; });
   function stop() {
+    coordinator?.release();
     wanted = false;
     request++;
     persist();
@@ -116,6 +119,8 @@
     const attempt = ++request;
     showMessage("");
     showState("loading");
+    function playOwned() {
+    if (attempt !== request || !wanted || leaving) return;
     if (!audio.hasAttribute("src")) audio.src = current().src;
     else if (audio.error) audio.load();
     if (audio.readyState >= 1) restorePosition();
@@ -124,6 +129,7 @@
     }, error => {
       if (attempt !== request) return;
       wanted = false;
+      coordinator?.release();
       showState("paused");
       const text = error.name === "NotAllowedError"
         ? "자동 재생이 제한된 브라우저예요. 재생 버튼을 누르면 음악이 시작됩니다."
@@ -131,6 +137,9 @@
       help.textContent = text;
       if (!automatic) showMessage(text);
     });
+    }
+    if (coordinator) coordinator.request(automatic, playOwned, () => { if (attempt === request) { wanted = false; showState("paused"); help.textContent = "다른 탭에서 음악을 듣고 있어요. 재생을 누르면 이 탭에서 이어받습니다."; } });
+    else playOwned();
   }
   function choose(index, automatic = false) {
     if (leaving) return;
@@ -146,10 +155,11 @@
     if (enabled) start(automatic);
   }
   toggles.forEach(button => button.addEventListener("click", () => {
-    if (wanted) { enabled = false; stop(); showMessage(""); }
+    if (wanted) { enabled = false; coordinator?.pauseAll(); stop(); showMessage(""); }
     else { enabled = true; start(); }
     savePreference();
   }));
+  player.querySelector(".music-stop-all")?.addEventListener("click", () => { enabled=false; coordinator?.pauseAll(); stop(); savePreference(); help.textContent="모든 탭에서 음악을 껐어요."; });
   previous.addEventListener("click", () => choose(cursor - 1));
   next.addEventListener("click", () => choose(cursor + 1));
   select.addEventListener("change", () => {
@@ -170,6 +180,7 @@
   audio.addEventListener("pause", () => {
     // A pause queued by the previous source must not cancel the new source's play().
     if (!audio.paused) return;
+    coordinator?.release();
     wanted = false;
     request++;
     persist();
@@ -201,7 +212,7 @@
   window.addEventListener("scroll", compact, { passive: true });
   window.addEventListener("pagehide", () => { leaving = true; stop(); });
   window.addEventListener("pageshow", event => {
-    if (event.persisted) { leaving = false; compact(); if (enabled) start(true); }
+    if (event.persisted) { const latest = read("localStorage", preferenceKey); if (typeof latest?.enabled === "boolean") enabled = latest.enabled; leaving = false; compact(); if (enabled) start(true); else stop(); }
   });
   updateTrack();
   setVolume();

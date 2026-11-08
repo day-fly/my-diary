@@ -86,7 +86,7 @@ test('changing the vault to public mid-upload aborts before private bytes are wr
 
 test('deleting a private post targets only its private revision and leaves public posts untouched',async()=>{
   const a=setup({privatePost:secret});await flush();await a.load('private');a.el('delete-post').click();await flush();
-  assert.equal(a.writes.length,1);assert.equal(a.writes[0].vault,true);assert.equal(a.writes[0].method,'DELETE');assert.equal(a.writes[0].data.sha,'private-sha');
+  assert.equal(a.writes.length,2);assert.equal(a.writes[0].vault,true);assert.match(a.writes[0].path,/^_diary_trash\//);assert.equal(a.writes[1].vault,true);assert.equal(a.writes[1].method,'DELETE');assert.equal(a.writes[1].data.sha,'private-sha');
   assert.equal(a.privateFiles.has(path),false);assert.equal(a.publicFiles.get(path).buffer.toString(),original);a.close();
 });
 test('a private draft restores in the same tab without becoming public or losing its source revision',async()=>{

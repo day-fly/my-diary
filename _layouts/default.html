@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="{{ page.excerpt | default: site.description | strip_html | normalize_whitespace | escape }}" />
+    {% include social-meta.html %}
     <meta name="theme-color" content="#f7f6f2" />
     <script src="{{ '/assets/js/seasons.js' | relative_url }}"></script>
     <script src="{{ '/assets/js/author-auth.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>

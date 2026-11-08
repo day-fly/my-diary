@@ -22,19 +22,21 @@ layout: default
     </div>
   </header>
   {% if page.cover %}
+  {% assign photo_cover = site.data.photos[page.cover] %}
   {% assign cover_illustration = site.data.illustrations[page.cover] %}
   <figure class="post-cover">
     <img
-      src="{{ page.cover | relative_url }}"
+      src="{% if photo_cover %}{{ photo_cover.display | relative_url }}{% else %}{{ page.cover | relative_url }}{% endif %}"
       alt="{% if cover_illustration %}{{ cover_illustration.alt | escape }}{% else %}{{ page.title | escape }} 대표 이미지{% endif %}"
       {% if cover_illustration %}width="{{ cover_illustration.width }}" height="{{ cover_illustration.height }}"
       srcset="{{ cover_illustration.thumbnail | relative_url }} 480w, {{ page.cover | relative_url }} 1200w"
       sizes="(max-width: 760px) calc(100vw - 40px), 760px"{% endif %}
+      {% if photo_cover %}width="{{ photo_cover.display_width }}" height="{{ photo_cover.display_height }}" {% if photo_cover.small_width < photo_cover.display_width %}srcset="{{ photo_cover.small | relative_url }} {{ photo_cover.small_width }}w, {{ photo_cover.display | relative_url }} {{ photo_cover.display_width }}w"{% endif %} sizes="(max-width: 760px) calc(100vw - 40px), 760px"{% endif %}
       decoding="async"
     />
   </figure>
   {% endif %}
-  <div class="post-content">{{ content }}</div>
+  <div class="post-content">{% include post-body-images.html content=content %}</div>
   <div class="post-author">
     <a class="profile-identity" href="{{ '/about/' | relative_url }}"
       >{% include avatar.html %}<span

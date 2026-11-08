@@ -1,0 +1,9 @@
+{%- assign rendered_post_body = include.content -%}
+{%- for item in site.data.photos -%}
+  {%- assign original_src = item[0] | relative_url -%}
+  {%- assign photo = item[1] -%}
+  {%- capture match_src -%}src="{{ original_src }}"{%- endcapture -%}
+  {%- capture replacement_src -%}src="{{ photo.display | relative_url }}" {% if photo.small_width < photo.display_width %}srcset="{{ photo.small | relative_url }} {{ photo.small_width }}w, {{ photo.display | relative_url }} {{ photo.display_width }}w"{% endif %} sizes="(max-width: 760px) calc(100vw - 40px), 760px" width="{{ photo.display_width }}" height="{{ photo.display_height }}"{%- endcapture -%}
+  {%- assign rendered_post_body = rendered_post_body | replace: match_src, replacement_src -%}
+{%- endfor -%}
+{{- rendered_post_body | replace: '<img ', '<img loading="lazy" decoding="async" ' -}}

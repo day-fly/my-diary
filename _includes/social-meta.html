@@ -1,0 +1,25 @@
+{%- assign share_title = page.title | default: site.title -%}
+{%- assign share_description = page.excerpt | default: site.description | strip_html | normalize_whitespace | truncate: 160 -%}
+{%- assign share_image = '/assets/images/harusari-about-20261108.jpg' -%}
+{%- if page.layout == 'post' -%}
+  {%- include post-cover.html post=page -%}
+  {%- if resolved_cover != '' -%}{%- assign share_image = resolved_cover -%}{%- if cover_photo -%}{%- assign share_image = cover_photo.display -%}{%- endif -%}{%- endif -%}
+{%- endif -%}
+{%- assign share_prefix = site.baseurl | append: '/' -%}
+{%- assign share_start = share_image | slice: 0, share_prefix.size -%}
+{%- if share_start == share_prefix -%}{%- assign share_image = share_image | remove_first: site.baseurl -%}{%- endif -%}
+<link rel="canonical" href="{{ page.url | absolute_url }}" />
+<meta property="og:locale" content="ko_KR" />
+<meta property="og:site_name" content="{{ site.title | escape }}" />
+<meta property="og:type" content="{% if page.layout == 'post' %}article{% else %}website{% endif %}" />
+<meta property="og:title" content="{{ share_title | escape }}" />
+<meta property="og:description" content="{{ share_description | escape }}" />
+<meta property="og:url" content="{{ page.url | absolute_url }}" />
+<meta property="og:image" content="{{ share_image | absolute_url }}" />
+<meta property="og:image:alt" content="{{ share_title | escape }}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ share_title | escape }}" />
+<meta name="twitter:description" content="{{ share_description | escape }}" />
+<meta name="twitter:image" content="{{ share_image | absolute_url }}" />
+{% if page.layout == 'post' %}<meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}" /><meta name="author" content="{{ site.data.profile.name | escape }}" />{% endif %}
+{% if page.url == '/write/' %}<meta name="robots" content="noindex,nofollow" />{% endif %}

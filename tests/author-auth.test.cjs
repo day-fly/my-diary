@@ -126,6 +126,7 @@ test("other-tab logout clears this tab and BFCache restore rechecks expired cred
 function runWriter(a) {
   a.w.eval(readFileSync("assets/js/cover-image.js", "utf8"));
   a.w.eval(readFileSync("assets/js/private-posts.js", "utf8"));
+  a.w.eval(readFileSync("assets/js/writer-recovery.js", "utf8"));
   a.w.eval(readFileSync("assets/js/writer.js", "utf8"));
 }
 test("direct writer access stays locked, preserves drafts, and unlocks only after verified login", async () => {

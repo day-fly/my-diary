@@ -9,7 +9,7 @@ const key = 'myDiaryDraftV1:/my-diary:day-fly/my-diary:main';
 const flush = async () => { for (let i=0;i<30;i++) await new Promise(resolve => setImmediate(resolve)); };
 function response(data, status=200) { return { ok: status<400, status, headers:{get:()=> 'application/json'}, json:async()=>data, text:async()=>JSON.stringify(data) }; }
 let revisionCounter = 0;
-function setup({ stores, vaultState='private', privatePost, publicPost=original, failPrivateWrite=false, failDelete=false, privateDraft }={}) {
+function setup({ history=[], historical={}, stores, vaultState='private', privatePost, publicPost=original, failPrivateWrite=false, failDelete=false, privateDraft }={}) {
   const dom = new JSDOM(html, { url:'https://example.test/my-diary/write/', runScripts:'outside-only' });
   const w=dom.window, d=w.document;
   Object.assign(w,{ TextEncoder, TextDecoder, AbortController, File, Blob, confirm:()=>true });
@@ -38,6 +38,7 @@ function setup({ stores, vaultState='private', privatePost, publicPost=original,
       if(vault&&repoState==='missing') return response({message:'Not Found'},404);
       return response({private:vault&&repoState!=='public',owner:{login:'day-fly'},permissions:{push:repoState!=='read-only'}});
     }
+    if(match[2]==='/commits') return response(history);
     const p=decodeURIComponent(match[2].replace(/^\/contents\//,''));
     if(options.method==='PUT'||options.method==='DELETE') {
       const data=JSON.parse(options.body); writes.push({vault,path:p,method:options.method,data});
@@ -49,8 +50,8 @@ function setup({ stores, vaultState='private', privatePost, publicPost=original,
       put(files,p,Buffer.from(data.content,'base64'),'sha-'+(++revisionCounter));
       return response({content:{sha:files.get(p).sha}});
     }
-    if(p==='_posts'||p==='_diary_drafts') return response([...files.keys()].filter(file=>file.startsWith(p+'/')).map(file=>({path:file,name:file.split('/').pop(),type:'file',sha:files.get(file).sha})));
-    const file=files.get(p);
+    if(p==='_posts'||p==='_diary_drafts'||p==='_diary_trash') return response([...files.keys()].filter(file=>file.startsWith(p+'/')).map(file=>({path:file,name:file.split('/').pop(),type:'file',sha:files.get(file).sha})));
+    const file=historical[u.searchParams.get('ref')] || files.get(p);
     if(!file) return response({message:'Not Found'},404);
     if(options.headers?.Accept==='application/vnd.github.raw+json') return {ok:true,status:200,blob:async()=>new Blob([file.buffer])};
     return response({sha:file.sha,content:file.buffer.toString('base64')});
@@ -59,6 +60,8 @@ function setup({ stores, vaultState='private', privatePost, publicPost=original,
   w.eval(readFileSync('assets/js/cover-image.js','utf8'));
   w.eval(readFileSync('assets/js/private-posts.js','utf8'));
   w.eval(readFileSync('assets/js/writer-library.js','utf8'));
+  w.eval(readFileSync('assets/js/writer-recovery.js','utf8'));
+  w.eval(readFileSync('assets/js/photo-editor.js','utf8'));
   w.eval(readFileSync('assets/js/writer.js','utf8'));
   const el=id=>d.getElementById(id);
   function input(id,value) {el(id).value=value;el(id).dispatchEvent(new w.Event('input',{bubbles:true}));}

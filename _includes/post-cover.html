@@ -18,3 +18,7 @@
     {%- assign resolved_cover = resolved_cover | relative_url -%}
   {%- endunless -%}
 {%- endif -%}
+
+{%- assign original_cover_path = resolved_cover | remove_first: site.baseurl -%}
+{%- assign cover_photo = site.data.photos[original_cover_path] -%}
+{%- if cover_photo -%}{%- assign resolved_cover = cover_photo.small | relative_url -%}{%- endif -%}

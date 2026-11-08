@@ -10,7 +10,7 @@ const tracks = JSON.parse(readFileSync("_data/music.json", "utf8"));
 const ids = tracks.map(track => track.id);
 const key = "diary:music:playlist:v1:/my-diary/";
 const legacyKey = "diary:music:/my-diary/assets/audio/touching-moments-one-pulse.mp3";
-function setup({ saved, preference, legacySaved, legacyPreference, blocked = false } = {}) {
+function setup({ saved, preference, legacySaved, legacyPreference, blocked = false, configure } = {}) {
   const dom = new JSDOM(markup, { url: "https://example.com/my-diary/", runScripts: "outside-only" });
   const w = dom.window, q = selector => w.document.querySelector(selector), audio = q("audio");
   let plays = 0, paused = true, ended = false, error = null;
@@ -31,6 +31,7 @@ function setup({ saved, preference, legacySaved, legacyPreference, blocked = fal
   if (legacySaved) w.sessionStorage.setItem(legacyKey, JSON.stringify(legacySaved));
   if (legacyPreference) w.localStorage.setItem(legacyKey + ":preference", JSON.stringify(legacyPreference));
   if (blocked) ["sessionStorage", "localStorage"].forEach(name => Object.defineProperty(w, name, { get() { throw new Error("blocked"); } }));
+  if(configure)configure(w);
   w.eval(source);
   return {
     w, q, audio, requests, plays: () => plays, click: () => q(".music-toggle").click(),
