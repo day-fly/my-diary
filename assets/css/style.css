@@ -1852,45 +1852,46 @@ h1 {
   .music-player.is-compact .music-details > .music-expand-icon { display: none; }
   .music-player.is-compact .music-details > .music-compact-icon { display: block; transform: none; }
 }
-/* Small decorative particles stay in the outer margins, clear of the text. */
+/* Light, non-interactive particles drift across the whole viewport. */
 .season-effects {
   position: fixed;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 0;
+  z-index: 2;
   contain: strict;
 }
 .site-header, .page-wrap, .site-footer { position: relative; z-index: 1; }
 .season-particle {
+  --particle-size: var(--size);
   position: absolute;
   top: -30px;
-  left: calc(3px + var(--lane) * min(1vw, 10px));
-  width: var(--size);
-  height: calc(var(--size) * 1.5);
+  left: var(--x);
+  width: var(--particle-size);
+  height: calc(var(--particle-size) * 1.5);
   border-radius: 2px 80% 3px 80%;
   background: #b07c48;
   opacity: 0;
   animation: season-fall var(--duration) linear var(--delay) infinite;
 }
-.season-particle.from-right { left: auto; right: calc(3px + var(--lane) * min(1vw, 10px)); }
 .season-particle::after { content: ""; position: absolute; width: 1px; height: 75%; left: 50%; top: 12%; background: #ffffff70; transform: rotate(-25deg); }
-html[data-season="spring"] .season-particle { background: #d79bac; border-radius: 80% 20% 70% 35%; height: calc(var(--size) * 1.2); }
+html[data-season="spring"] .season-particle { background: #d79bac; border-radius: 80% 20% 70% 35%; height: calc(var(--particle-size) * 1.2); }
 html[data-season="spring"] .season-particle::after { display: none; }
 html[data-season="summer"] .season-particle { background: #779765; border-radius: 0 90% 0 90%; animation-duration: calc(var(--duration) * 1.4); }
-html[data-season="winter"] .season-particle { width: calc(var(--size) * .65); height: calc(var(--size) * .65); border-radius: 50%; background: #fff; border: 1px solid #a9bdcf; }
+html[data-season="winter"] .season-particle { width: calc(var(--particle-size) * .65); height: calc(var(--particle-size) * .65); border-radius: 50%; background: #fff; border: 1px solid #a9bdcf; }
 html[data-season="winter"] .season-particle::after { display: none; }
 .season-effects[data-paused="true"] .season-particle { animation-play-state: paused; }
 @keyframes season-fall {
   0% { transform: translate3d(0, -20px, 0) rotate(0); opacity: 0; }
-  10% { opacity: .45; }
-  50% { transform: translate3d(5px, 50vh, 0) rotate(calc(var(--turn) * .5)); }
-  90% { opacity: .35; }
-  100% { transform: translate3d(0, calc(100vh + 40px), 0) rotate(var(--turn)); opacity: 0; }
+  10% { opacity: .36; }
+  25% { transform: translate3d(calc(var(--drift) * .65), 25vh, 0) rotate(calc(var(--turn) * .25)); }
+  50% { transform: translate3d(calc(var(--drift) * .2), 50vh, 0) rotate(calc(var(--turn) * .5)); }
+  75% { transform: translate3d(calc(var(--drift) * 1.15), 75vh, 0) rotate(calc(var(--turn) * .75)); }
+  90% { opacity: .24; }
+  100% { transform: translate3d(var(--drift), calc(100vh + 40px), 0) rotate(var(--turn)); opacity: 0; }
 }
 @media (max-width: 760px) {
-  .season-particle { left: calc(1px + var(--lane) * 1px); width: 6px; height: 9px; }
-  .season-particle.from-right { right: calc(1px + var(--lane) * 1px); }
+  .season-particle { --particle-size: calc(var(--size) * .8); }
   .season-particle:nth-child(3n) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {

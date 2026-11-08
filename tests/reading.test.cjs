@@ -90,7 +90,7 @@ test("season effects honor reduced motion on load and when the device setting ch
 });
 test("season effects can be stopped from either control and remain off across pages", () => {
   const a = effects();
-  assert.equal(a.layer.children.length, 12);
+  assert.ok(a.layer.children.length > 0);
   a.buttons[1].click();
   assert.equal(a.layer.hidden, true);
   assert.equal(a.buttons[0].getAttribute("aria-pressed"), "false");

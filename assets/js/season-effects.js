@@ -7,15 +7,15 @@
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let enabled = true;
   try { enabled = localStorage.getItem(key) !== "off"; } catch (_) {}
-  for (let index = 0; index < 12; index++) {
+  for (let index = 0; index < 18; index++) {
     const particle = document.createElement("span");
     particle.className = "season-particle";
-    particle.style.setProperty("--lane", String(index % 6));
+    particle.style.setProperty("--x", (4 + (index * 0.618034 % 1) * 92).toFixed(2) + "%");
+    particle.style.setProperty("--drift", ((index % 2 ? -1 : 1) * (20 + index % 5 * 9)) + "px");
     particle.style.setProperty("--duration", (19 + index % 5 * 4) + "s");
     particle.style.setProperty("--delay", (-index * 3.7) + "s");
     particle.style.setProperty("--turn", (index % 2 ? -210 : 240) + "deg");
     particle.style.setProperty("--size", (7 + index % 3 * 2) + "px");
-    if (index >= 6) particle.classList.add("from-right");
     layer.append(particle);
   }
   function render() {
