@@ -116,6 +116,8 @@
   }
   window.DiaryPrivate = {
     check, assert, stage, preview, prepare, clear,
+    pendingFiles: text => references(text).filter(ref => ref.startsWith("diary-pending:")).map(ref => { const file=pending.get(ref); if(!file) throw new Error("첨부 사진을 찾지 못했어요. 다시 선택해 주세요."); return {ref,file}; }),
+    restoreFiles: files => { for(const {ref,file} of files) { if(!/^diary-pending:[a-f0-9]{24}$/.test(ref)) continue; if(urls.has(ref)) URL.revokeObjectURL(urls.get(ref)); pending.set(ref,file); urls.set(ref,URL.createObjectURL(file)); } },
     isPrivate: repo => repo === repository,
     url: ref => urls.get(ref) || "",
     hasPending: text => references(text).some(ref => ref.startsWith("diary-pending:")),

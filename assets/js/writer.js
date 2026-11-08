@@ -45,6 +45,9 @@
   var dateInput = document.getElementById("post-date");
   var visibilityInput = document.getElementById("post-visibility");
   var coverInput = document.getElementById("cover-image");
+  var restoredCoverFile = null;
+  function coverFile() { return coverInput.files[0] || restoredCoverFile; }
+  var localSaveTimer, localSaveVersion = 0, localSnapshotSaved = false;
   var autoCoverInput = document.getElementById("auto-cover");
   var coverXInput = document.getElementById("cover-x"), coverYInput = document.getElementById("cover-y");
   function coverPosition(x, y) { coverXInput.value = Math.max(0,Math.min(100,Number.isFinite(Number(x)) ? Number(x) : 50)); coverYInput.value = Math.max(0,Math.min(100,Number.isFinite(Number(y)) ? Number(y) : 50)); }
@@ -731,6 +734,7 @@
   }
 
   function updatePreview() {
+    window.DiaryRichEditor?.setMarkdown(bodyInput.value);
     document.getElementById("word-count").textContent =
       bodyInput.value.replace(/\s/g, "").length.toLocaleString("ko-KR") + "자";
     previewDate.textContent = formatDisplayDate(dateInput.value);
@@ -741,8 +745,8 @@
     previewCover.innerHTML = "";
     previewGallery.innerHTML = "";
 
-    if (coverInput.files && coverInput.files[0]) {
-      coverObjectUrl = URL.createObjectURL(coverInput.files[0]);
+    if (coverInput.files && coverFile()) {
+      coverObjectUrl = URL.createObjectURL(coverFile());
       var uploadedCover = document.createElement("img");
       uploadedCover.src = coverObjectUrl;
       uploadedCover.alt = "표지 미리보기";
@@ -775,7 +779,7 @@
         previewGallery.appendChild(frame);
       });
     }
-    if (!coverInput.files.length)
+    if (!(coverFile() ? 1 : 0))
       document.getElementById("cover-file-status").textContent =
         "긴 변 1,600px 이내로 줄여 JPG로 저장해요. 작은 사진은 확대하지 않아요.";
     updateCoverCard();
@@ -815,7 +819,8 @@
   }
 
   coverInput.addEventListener("change", async function () {
-    var file = coverInput.files[0];
+    restoredCoverFile = null;
+    var file = coverFile();
     var status = document.getElementById("cover-file-status");
     if (!file) {
       status.textContent = "긴 변 1,600px 이내로 줄여 JPG로 저장해요.";
@@ -825,7 +830,7 @@
       validateImage(file);
       status.textContent = "표지 사진 크기를 조정하고 있어요…";
       var prepared = await window.DiaryCoverImage.prepare(file);
-      if (coverInput.files[0] !== file) return;
+      if (coverFile() !== file) return;
       status.textContent =
         prepared.width +
         " × " +
@@ -834,11 +839,11 @@
         Math.ceil(prepared.file.size / 1024) +
         "KB · 발행할 때 저장됩니다.";
     } catch (error) {
-      if (coverInput.files[0] === file) status.textContent = error.message;
+      if (coverFile() === file) status.textContent = error.message;
     }
   });
   document.getElementById("clear-cover").addEventListener("click", function () {
-    coverInput.value = "";
+    coverInput.value = ""; restoredCoverFile = null;
     coverUrlInput.value = "";
     autoCoverInput.checked = false;
     document.getElementById("cover-file-status").textContent =
@@ -1184,7 +1189,7 @@
     titleInput.value = "";
     bodyInput.value = "";
     coverUrlInput.value = "";
-    coverInput.value = "";
+    coverInput.value = ""; restoredCoverFile = null;
     autoCoverInput.checked = true; coverPosition(50,50);
     galleryInput.value = "";
     appendGalleryInput.checked = true;
@@ -1521,7 +1526,7 @@
       autoCoverInput.checked = parsed.data.cover_auto !== "false"; coverPosition(parsed.data.cover_x ?? 50,parsed.data.cover_y ?? 50);
       bodyInput.value = parsed.body.replace(/^\n+/, "");
       currentPostPathInput.value = path;
-      coverInput.value = "";
+      coverInput.value = ""; restoredCoverFile = null;
       galleryInput.value = "";
       appendGalleryInput.checked = false;
 
@@ -1634,7 +1639,7 @@
   async function saveCloudDraft(asCopy) {
     if (busy) return;
     var info = ensureConnectionInfo(); if (!info) return;
-    if (!titleInput.value.trim() && !bodyInput.value.trim() && !coverInput.files.length && !galleryInput.files.length && !savedGallery.length) {
+    if (!titleInput.value.trim() && !bodyInput.value.trim() && !(coverFile() ? 1 : 0) && !galleryInput.files.length && !savedGallery.length) {
       setStatus("제목이나 본문을 적거나 사진을 추가한 뒤 보관해 주세요.", "status-info"); return;
     }
     var epoch = writerEpoch;
@@ -1648,15 +1653,15 @@
       if ((current ? current.sha : null) !== expectedSha) throw new Error("다른 기기에서 이 임시글이 변경됐어요. 새 임시글로 보관하거나 최신 내용을 다시 불러와 주세요.");
       var data = draftData();
       var upload = function (file) { return uploadImage(target.owner, target.repo, target.branch, target.token, file, "draft-" + id); };
-      Array.from(coverInput.files).concat(Array.from(galleryInput.files)).forEach(validateImage);
-      if (coverInput.files[0]) data.cover = await upload((await window.DiaryCoverImage.prepare(coverInput.files[0])).file);
+      (coverFile() ? [coverFile()] : []).concat(Array.from(galleryInput.files)).forEach(validateImage);
+      if (coverFile()) data.cover = await upload((await window.DiaryCoverImage.prepare(coverFile())).file);
       data.body = await window.DiaryPrivate.prepare(data.body, target, upload, true);
       data.cover = await window.DiaryPrivate.prepare(data.cover, target, upload, true);
       data.galleryRefs = [];
       for (var ref of savedGallery) data.galleryRefs.push(await window.DiaryPrivate.prepare(ref, target, upload, true));
       for (var file of Array.from(galleryInput.files)) data.galleryRefs.push(await upload(file));
       data.version = 1; data.hasFiles = false; data.privateWorkspace = true;
-      delete data.cloudDraftId; delete data.cloudDraftSha; delete data.cloudSnapshot;
+      delete data.localTab; delete data.cloudDraftId; delete data.cloudDraftSha; delete data.cloudSnapshot;
       if (asCopy) { data.path = ""; data.sha = null; data.frontMatter = ""; data.loadedVisibility = "public"; data.moveTarget = null; data.publishedSnapshot = ""; }
       var text = JSON.stringify(data, null, 2) + "\n";
       if (new TextEncoder().encode(text).length > 900000) throw new Error("임시글이 너무 길어요. 여러 글로 나눠 보관해 주세요.");
@@ -1665,7 +1670,7 @@
       if (!ensureConnectionInfo() || epoch !== writerEpoch) return;
       cloudDraftId = id; cloudDraftSha = saved.content.sha; privateWorkspace = true;
       bodyInput.value = data.body; coverUrlInput.value = data.cover; savedGallery = data.galleryRefs;
-      coverInput.value = ""; galleryInput.value = "";
+      coverInput.value = ""; restoredCoverFile = null; galleryInput.value = "";
       if (asCopy) { currentPostPathInput.value = ""; loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null; publishedSnapshot = ""; }
       cloudSnapshot = snapshot(); saveDraft(); updatePreview();
       await loadPostList(true);
@@ -1694,7 +1699,7 @@
       loadedFrontMatter = typeof data.frontMatter === "string" ? data.frontMatter : ""; moveTarget = data.moveTarget || null;
       coverUrlInput.value = data.cover || ""; autoCoverInput.checked = data.autoCover !== false; coverPosition(data.coverX ?? 50,data.coverY ?? 50);
       appendGalleryInput.checked = data.appendGallery !== false; savedGallery = data.galleryRefs;
-      coverInput.value = ""; galleryInput.value = ""; cloudDraftId = item.id; cloudDraftSha = meta.sha; privateWorkspace = true;
+      coverInput.value = ""; restoredCoverFile = null; galleryInput.value = ""; cloudDraftId = item.id; cloudDraftSha = meta.sha; privateWorkspace = true;
       publishedSnapshot = data.publishedSnapshot || ""; cloudSnapshot = snapshot();
       saveDraft(); updatePreview(); updateMode(); showEditor(true);
       document.querySelector(".writing-sheet").scrollIntoView({ block:"start", behavior:"smooth" });
@@ -1777,7 +1782,7 @@
       return;
     }
     try {
-      Array.from(coverInput.files)
+      (coverFile() ? [coverFile()] : [])
         .concat(Array.from(galleryInput.files))
         .forEach(validateImage);
     } catch (error) {
@@ -1834,10 +1839,10 @@
       var galleryUrls = savedGallery.slice();
       var revision = newCloudDraftId();
 
-      if (coverInput.files && coverInput.files[0]) {
+      if (coverInput.files && coverFile()) {
         setStatus("표지 사진 업로드 중...", "status-info");
         var preparedCover = await window.DiaryCoverImage.prepare(
-          coverInput.files[0],
+          coverFile(),
         );
         coverUrl = await uploadImage(
           info.owner,
@@ -1848,7 +1853,7 @@
           slug,
         );
         coverUrlInput.value = coverUrl;
-        coverInput.value = "";
+        coverInput.value = ""; restoredCoverFile = null;
         saveDraft();
       }
 
@@ -1982,6 +1987,7 @@
   }
   function draftData() {
     return {
+      localTab: window.DiaryLocalDrafts?.tabId || null,
       cloudDraftId: cloudDraftId, cloudDraftSha: cloudDraftSha, cloudSnapshot: cloudSnapshot, privateWorkspace: privateWorkspace,
       galleryRefs: savedGallery.slice(),
       visibility: visibilityInput.value,
@@ -1998,7 +2004,7 @@
       frontMatter: loadedFrontMatter,
       appendGallery: appendGalleryInput.checked,
       publishedSnapshot: publishedSnapshot,
-      hasFiles: !!(coverInput.files.length || galleryInput.files.length || window.DiaryPrivate?.hasPending(bodyInput.value+"\n"+savedGallery.join("\n"))),
+      hasFiles: !!((coverFile() ? 1 : 0) || galleryInput.files.length || window.DiaryPrivate?.hasPending(bodyInput.value+"\n"+savedGallery.join("\n"))),
       updatedAt: new Date().toISOString(),
     };
   }
@@ -2019,18 +2025,18 @@
         !!bodyInput.value ||
         !!coverUrlInput.value ||
         !!savedGallery.length ||
-        !!coverInput.files.length ||
+        !!(coverFile() ? 1 : 0) ||
         !!galleryInput.files.length) &&
       (snapshot() !== publishedSnapshot ||
-        coverInput.files.length ||
+        (coverFile() ? 1 : 0) ||
         galleryInput.files.length)
     );
   }
   function hasUnstoredChanges() {
-    return hasChanges() && (snapshot() !== cloudSnapshot || coverInput.files.length || galleryInput.files.length);
+    return hasChanges() && (snapshot() !== cloudSnapshot || (coverFile() ? 1 : 0) || galleryInput.files.length);
   }
   function saveDraft() {
-    if (!workspaceInitialized) return;
+    if (!workspaceInitialized || !ensureConnectionInfo()) return;
     try {
       var privateDraft = privateWorkspace || visibilityInput.value === "private" || loadedVisibility === "private";
       if (privateDraft) {
@@ -2047,20 +2053,59 @@
           hour: "2-digit",
           minute: "2-digit",
         });
-      if (privateDraft) draftStatus.textContent += " · 이 탭에서만 보관";
+      if (privateDraft && !window.DiaryLocalDrafts) draftStatus.textContent += " · 이 탭에서만 보관";
       if (cloudDraftId) draftStatus.textContent += snapshot() === cloudSnapshot ? " · 보관함에도 저장됨" : " · 보관함 저장 필요";
-      if (coverInput.files.length || galleryInput.files.length || (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value + "\n" + savedGallery.join("\n"))))
+      if (!window.DiaryLocalDrafts && ((coverFile() ? 1 : 0) || galleryInput.files.length || (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value + "\n" + savedGallery.join("\n")))))
         draftStatus.textContent += " · 다시 열 때 사진 재첨부 필요";
     } catch (_) {
       draftSaved = false;
       draftStatus.textContent =
         "임시저장 실패 · 창을 닫기 전 내용을 복사해 주세요";
     }
+    scheduleLocalSave();
   }
-  function restoreDraft() {
+  function scheduleLocalSave() {
+    if (!window.DiaryLocalDrafts || !workspaceInitialized || !ensureConnectionInfo()) return;
+    clearTimeout(localSaveTimer); localSnapshotSaved = false;
+    var version = ++localSaveVersion, epoch = writerEpoch;
+    draftStatus.textContent = "글과 사진을 이 기기에 임시저장 중…";
+    localSaveTimer = setTimeout(function () { persistLocalDraft(version, epoch); }, 180);
+  }
+  async function persistLocalDraft(version, epoch) {
+    if (!workspaceInitialized || !ensureConnectionInfo() || version !== localSaveVersion || epoch !== writerEpoch) return;
+    try {
+      var data = draftData(), sensitive = privateWorkspace || data.visibility === "private" || loadedVisibility === "private";
+      var files = window.DiaryPrivate.pendingFiles(data.body + "\n" + data.galleryRefs.join("\n"));
+      await window.DiaryLocalDrafts.write(data, files, coverFile(), sensitive);
+      if (version !== localSaveVersion || epoch !== writerEpoch || !ensureConnectionInfo()) return;
+      localSnapshotSaved = true; draftSaved = true;
+      draftStatus.textContent = "글과 사진 자동 임시저장 완료 · 이 기기에서 복원 가능";
+      if (cloudDraftId) draftStatus.textContent += snapshot() === cloudSnapshot ? " · 보관함에도 저장됨" : " · 보관함 저장 필요";
+    } catch (error) {
+      if (version !== localSaveVersion || epoch !== writerEpoch || !ensureConnectionInfo()) return;
+      localSnapshotSaved = false; draftStatus.textContent = "사진 자동 임시저장 실패 · 보관함 저장을 눌러 주세요";
+    }
+  }
+  async function restoreLocalDraft() {
+    var epoch = writerEpoch;
+    if (!window.DiaryLocalDrafts) { restoreDraft(); return; }
+    try {
+      var record = await window.DiaryLocalDrafts.read();
+      if (epoch !== writerEpoch || !ensureConnectionInfo()) return;
+      var fallback = JSON.parse(sessionStorage.getItem(draftKey() + ":private") || localStorage.getItem(draftKey()) || "null");
+      if (record && (!fallback || fallback.localTab !== window.DiaryLocalDrafts.tabId || record.data.updatedAt >= fallback.updatedAt)) {
+        window.DiaryPrivate.restoreFiles(record.files); restoredCoverFile = record.cover;
+        restoreDraft(record.data); localSnapshotSaved = true;
+        draftStatus.textContent = "글과 사진을 함께 복원했어요";
+      } else restoreDraft();
+    } catch (error) {
+      if (epoch === writerEpoch && ensureConnectionInfo()) { restoreDraft(); draftStatus.textContent = "글 임시저장만 사용 중 · 사진은 보관함 저장을 눌러 주세요"; }
+    }
+  }
+  function restoreDraft(savedData) {
     publishedSnapshot = snapshot();
     try {
-      var draft = JSON.parse(sessionStorage.getItem(draftKey() + ":private") || localStorage.getItem(draftKey()) || "null");
+      var draft = savedData || JSON.parse(sessionStorage.getItem(draftKey() + ":private") || localStorage.getItem(draftKey()) || "null");
       if (
         !draft ||
         typeof draft.body !== "string" ||
@@ -2070,7 +2115,7 @@
       cloudDraftId = /^[a-f0-9]{24}$/.test(draft.cloudDraftId || "") ? draft.cloudDraftId : null;
       cloudDraftSha = cloudDraftId ? draft.cloudDraftSha : null; cloudSnapshot = draft.cloudSnapshot || "";
       privateWorkspace = !!draft.privateWorkspace || !!cloudDraftId;
-      savedGallery = Array.isArray(draft.galleryRefs) ? draft.galleryRefs.filter(function (url) { return typeof url === "string" && /^diary-private:\/assets\//.test(url); }) : [];
+      savedGallery = Array.isArray(draft.galleryRefs) ? draft.galleryRefs.filter(function (url) { return typeof url === "string" && (/^diary-private:\/assets\//.test(url) || (!!savedData && /^diary-pending:/.test(url) && !!window.DiaryPrivate.url(url))); }) : [];
       visibilityInput.value = draft.visibility === "private" ? "private" : "public";
       loadedVisibility = draft.loadedVisibility === "private" ? "private" : "public";
       moveTarget = draft.moveTarget || null;
@@ -2085,7 +2130,7 @@
       appendGalleryInput.checked = draft.appendGallery !== false;
       publishedSnapshot = draft.publishedSnapshot || "";
       draftStatus.textContent = "이 브라우저의 임시글을 복원했어요";
-      if (draft.hasFiles)
+      if (draft.hasFiles && !savedData)
         setStatus(
           "글을 복원했습니다. 이전에 선택한 사진 파일은 다시 선택해 주세요.",
           "status-info",
@@ -2128,6 +2173,7 @@
       disabledBefore = [];
     }
     busy = value;
+    window.DiaryRichEditor?.setBusy(value);
     if (window.DiaryLibrary) window.DiaryLibrary.setBusy(value);
     renderSavedPhotos();
     if (!value) updateMode();
@@ -2168,6 +2214,7 @@
   document.getElementById("save-draft-copy").addEventListener("click", function () { saveCloudDraft(true); });
   document.querySelectorAll("[data-format]").forEach(function (button) {
     button.addEventListener("click", function () {
+      if (window.DiaryRichEditor?.format(button.dataset.format)) return;
       var start = bodyInput.selectionStart;
       var end = bodyInput.selectionEnd;
       var selected = bodyInput.value.slice(start, end);
@@ -2213,10 +2260,9 @@
     if (
       busy ||
       (!draftSaved && hasChanges()) ||
-      coverInput.files.length ||
-      galleryInput.files.length ||
+      (!localSnapshotSaved && ((coverFile() ? 1 : 0) || galleryInput.files.length ||
       ((privateWorkspace || visibilityInput.value === "private") && hasUnstoredChanges()) ||
-      (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value + "\n" + savedGallery.join("\n"))) ||
+      (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value + "\n" + savedGallery.join("\n"))))) ||
       document.getElementById("profile-photo").files.length ||
       JSON.stringify(readProfile()) !== profileBaseline
     ) {
@@ -2224,9 +2270,9 @@
       event.returnValue = "";
     }
   });
-  window.addEventListener("pagehide", function () {
-    if (hasChanges()) saveDraft();
-  });
+  function flushLocalSave() { if (window.DiaryLocalDrafts && workspaceInitialized && ensureConnectionInfo() && !localSnapshotSaved) { clearTimeout(localSaveTimer); persistLocalDraft(localSaveVersion, writerEpoch); } }
+  window.addEventListener("pagehide", flushLocalSave);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) flushLocalSave(); });
   tokenInput.addEventListener("input", updateConnectionState);
   window.addEventListener("hashchange", function () {
     if (window.location.hash === "#profile")
@@ -2441,6 +2487,10 @@
       }
     });
 
+  window.DiaryRichEditor?.init({url:toSafePreviewUrl,
+    stage:function(files){if(!ensureConnectionInfo() || busy)throw new Error("작성자 로그인 후 사진을 추가해 주세요.");files.forEach(validateImage);return files.map(function(file,index){return {src:window.DiaryPrivate.stage(file),alt:"본문 사진 "+(index+1)};});},
+    insertSource:function(text){insertTextAtCursor(bodyInput,"\n"+text+"\n");updatePreview();saveDraft();},error:function(text){setStatus(text,"status-error");}});
+  window.DiaryExport?.init({info:ensureConnectionInfo,busy:function(){return busy;},setBusy:setBusy,parse:parseMarkdown});
   window.DiaryRecovery?.init({
     info:ensureConnectionInfo,busy:function(){return busy;},setBusy:setBusy,
     get:function(info,path){return getContentMeta(info.owner,info.repo,info.branch,path,info.token);},
@@ -2535,15 +2585,17 @@
 
   loadConfig();
   updateConnectionState();
-  function handleAuthorState() {
+  async function handleAuthorState() {
     var info = window.DiaryAuth && window.DiaryAuth.getConnection();
     if (info) {
       tokenInput.value = info.token;
       if (!workspaceInitialized) {
         workspaceInitialized = true;
         if (!dateInput.value) dateInput.value = formatDatetimeLocal(new Date());
-        restoreDraft();
-        updatePreview();
+        var initialEpoch = writerEpoch; setBusy(true);
+        await restoreLocalDraft();
+        if (initialEpoch !== writerEpoch || !ensureConnectionInfo()) { setBusy(false); return; }
+        setBusy(false); updatePreview();
         updateMode();
         renderProfilePreview();
         if (window.location.hash === "#profile") document.getElementById("profile").open = true;
@@ -2556,12 +2608,14 @@
       if (workspaceInitialized && hasChanges()) saveDraft();
       var authStatus = window.DiaryAuth && window.DiaryAuth.getState().status;
       if (authStatus !== "checking" && workspaceInitialized) {
+        clearTimeout(localSaveTimer); localSaveVersion++; localSnapshotSaved = false;
+        window.DiaryLocalDrafts?.clearSensitive(); window.DiaryExport?.clear(); window.DiaryRichEditor?.clear();
         window.DiaryRecovery?.clear();
         writerEpoch++; libraryVersion++; libraryLoaded = false; libraryDrafts = []; publicTitleCache.clear();
         if (privateWorkspace || visibilityInput.value === "private" || loadedVisibility === "private") {
           try { sessionStorage.removeItem(draftKey() + ":private"); } catch (_) {}
           titleInput.value = ""; bodyInput.value = ""; coverUrlInput.value = "";
-          coverInput.value = ""; galleryInput.value = ""; currentPostPathInput.value = "";
+          coverInput.value = ""; restoredCoverFile = null; galleryInput.value = ""; currentPostPathInput.value = "";
           loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null;
           visibilityInput.value = "public"; previewRequest++;
           savedGallery = []; cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; privateWorkspace = false;

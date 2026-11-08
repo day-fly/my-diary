@@ -2003,3 +2003,41 @@ html[data-season="winter"] .season-particle::after { display: none; }
 #recovery-text { width: 100%; box-sizing: border-box; margin: 10px 0 16px; padding: 16px; font: 16px/1.9 var(--serif); border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
 .music-stop-all { min-height: 40px; width: 100%; margin: 10px 0; background: none; border: 1px solid var(--line); border-radius: 5px; color: var(--ink-soft); font: 12px/1.5 var(--sans); cursor: pointer; }
 @media(max-width:760px) { .photo-edit-item { align-items: flex-start; } .photo-edit-actions { flex:1; } .photo-edit-actions button { flex:1 0 40%; } }
+
+/* The editing surface shares the published type and keeps controls above the keyboard. */
+.body-field[hidden], .rich-body[hidden], .rich-link-panel[hidden] { display: none; }
+.rich-editor-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 32px; }
+.rich-editor-tools button, .rich-photo-button { min-height: 44px; }
+.rich-photo-button { position: relative; overflow: hidden; cursor: pointer; margin: 0; font: 12px/1.7 var(--sans); }
+.rich-photo-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.rich-editor-tools .text-link { margin-left: auto; border: 0; background: none; font: 12px var(--sans); color: var(--ink-soft); }
+.rich-body { min-height: 360px; padding: 12px 32px 24px; }
+.ProseMirror { position: relative; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 360px; padding: 16px 0; outline: none; font: 17px/2.05 var(--serif); }
+.ProseMirror:focus-visible { outline: 2px solid var(--line); outline-offset: 4px; border-radius: 3px; }
+.ProseMirror p { margin: 0 0 1.3em; }
+.ProseMirror p:only-child:has(br.ProseMirror-trailingBreak)::before { color: var(--ink-soft); }
+.ProseMirror > p:only-child:empty::before { content: attr(data-placeholder); }
+.ProseMirror pre { white-space: pre-wrap; }
+.ProseMirror li { position: relative; }
+.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+.ProseMirror-hideselection *::selection { background: transparent; }
+.ProseMirror-gapcursor { display: none; pointer-events: none; position: absolute; }
+.rich-image { display: inline-block; max-width: 100%; vertical-align: middle; line-height: 1; }
+.rich-image img { display: block; max-width: 100%; max-height: 540px; width: auto; height: auto; border-radius: 4px; }
+.rich-image span { display: inline-block; padding: 22px; background: var(--subtle-surface); font: 13px/1.5 var(--sans); }
+.rich-image [hidden] { display: none; }
+.rich-raw-block { background: var(--subtle-surface); border: 1px solid var(--line); padding: 14px; font: 13px/1.7 var(--sans); white-space: pre-wrap; }
+.rich-link-panel { padding: 16px; border: 1px solid var(--line); margin-bottom: 18px; }
+@media(max-width:760px) { .rich-editor-tools { gap: 6px; } .rich-editor-tools .btn-light { padding: 8px 10px; } .ProseMirror { font-size: 17px; min-height: 320px; } .rich-image img { max-height: 380px; } }
+
+img.ProseMirror-separator { display: inline !important; border: none !important; margin: 0 !important; width: 0 !important; height: 0 !important; }
+.ProseMirror-hideselection { caret-color: transparent; }
+.ProseMirror [draggable][contenteditable=false] { user-select: text; }
+.ProseMirror { white-space: break-spaces; font-variant-ligatures: none; }
+.rich-image img { margin: 12px 0; }
+#rich-source-notice { margin: 0 32px 12px; }
+.rich-link-panel { margin-inline: 32px; }
+@media(max-width:760px) { .rich-body { padding: 8px 20px 20px; } .rich-editor-tools { padding: 10px 20px; } #rich-source-notice { margin-inline: 20px; } .rich-link-panel { margin-inline: 20px; } }
+
+.ProseMirror.is-empty::before { content: attr(data-placeholder); position: absolute; top: 16px; left: 0; color: var(--ink-soft); pointer-events: none; }
+.format-toolbar button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
