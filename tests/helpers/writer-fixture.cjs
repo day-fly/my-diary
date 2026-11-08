@@ -9,7 +9,7 @@ const key = 'myDiaryDraftV1:/my-diary:day-fly/my-diary:main';
 const flush = async () => { for (let i=0;i<30;i++) await new Promise(resolve => setImmediate(resolve)); };
 function response(data, status=200) { return { ok: status<400, status, headers:{get:()=> 'application/json'}, json:async()=>data, text:async()=>JSON.stringify(data) }; }
 let revisionCounter = 0;
-function setup({ history=[], historical={}, stores, vaultState='private', privatePost, publicPost=original, failPrivateWrite=false, failDelete=false, privateDraft }={}) {
+function setup({ localDB, localSession, localValues, locks, visual=false, exporter=false, history=[], historical={}, stores, vaultState='private', privatePost, publicPost=original, failPrivateWrite=false, failDelete=false, privateDraft }={}) {
   const dom = new JSDOM(html, { url:'https://example.test/my-diary/write/', runScripts:'outside-only' });
   const w=dom.window, d=w.document;
   Object.assign(w,{ TextEncoder, TextDecoder, AbortController, File, Blob, confirm:()=>true });
@@ -62,6 +62,11 @@ function setup({ history=[], historical={}, stores, vaultState='private', privat
   w.eval(readFileSync('assets/js/writer-library.js','utf8'));
   w.eval(readFileSync('assets/js/writer-recovery.js','utf8'));
   w.eval(readFileSync('assets/js/photo-editor.js','utf8'));
+  if(locks)Object.defineProperty(w.navigator,'locks',{value:locks});
+  if(localValues)for(const [k,v] of Object.entries(localValues))w.localStorage.setItem(k,v);
+  if(localDB){w.indexedDB=localDB;if(localSession)for(const [k,v] of Object.entries(localSession))w.sessionStorage.setItem(k,v);w.eval(readFileSync('assets/js/local-drafts.js','utf8'));}
+  if(exporter)w.eval(readFileSync('assets/js/export-entry.js','utf8'));
+  if(visual)w.eval(readFileSync('assets/js/rich-editor-entry.js','utf8'));
   w.eval(readFileSync('assets/js/writer.js','utf8'));
   const el=id=>d.getElementById(id);
   function input(id,value) {el(id).value=value;el(id).dispatchEvent(new w.Event('input',{bubbles:true}));}
