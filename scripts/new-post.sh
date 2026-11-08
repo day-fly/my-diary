@@ -103,7 +103,6 @@ fi
 {
   echo "---"
   echo "title: \"$title_yaml\""
-  echo 'category: "일기"'
   echo "date: $timestamp"
   if [[ -n "$cover_line" ]]; then
     echo "$cover_line"

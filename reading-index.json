@@ -1,0 +1,5 @@
+---
+layout: null
+permalink: /reading-index.json
+---
+[{% for post in site.posts %}{% include post-cover.html post=post %}{% assign illustration = site.data.illustrations[post.cover] %}{% assign thumbnail = resolved_cover %}{% if illustration %}{% assign thumbnail = illustration.thumbnail | relative_url %}{% endif %}{"title":{{ post.title | jsonify }},"url":{{ post.url | relative_url | jsonify }},"date":{{ post.date | date: '%Y.%m.%d' | jsonify }},"text":{{ post.content | strip_html | normalize_whitespace | truncate: 5000 | jsonify }},"image":{{ thumbnail | jsonify }}}{% unless forloop.last %},{% endunless %}{% endfor %}]

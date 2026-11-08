@@ -6,7 +6,6 @@ layout: default
   <a class="back-link" href="{{ '/' | relative_url }}">← 모든 기록</a>
   <header class="post-header">
     <p class="post-date">
-      {{ page.category | default: '기록' }} <span aria-hidden="true">·</span>
       <time datetime="{{ page.date | date_to_xmlschema }}"
         >{{ page.date | date: '%Y.%m.%d' }}</time
       >
@@ -15,6 +14,12 @@ layout: default
     <a class="text-link" href="{{ '/about/' | relative_url }}"
       >{{ site.data.profile.name | escape }}</a
     >
+    <div class="reading-controls" role="group" aria-label="본문 글자 크기" hidden>
+      <span>글자 크기</span>
+      <button type="button" data-reading-size="decrease" aria-label="본문 글자 작게">가−</button>
+      <output id="reading-size" aria-live="polite">17px</output>
+      <button type="button" data-reading-size="increase" aria-label="본문 글자 크게">가+</button>
+    </div>
   </header>
   {% if page.cover %}
   {% assign cover_illustration = site.data.illustrations[page.cover] %}
@@ -57,4 +62,10 @@ layout: default
       ><strong>{{ page.next.title | escape }}</strong></a
     >{% endif %}
   </nav>
+  <section class="related-posts" aria-labelledby="related-title" data-current-post="{{ page.url | relative_url }}" data-reading-index="{{ '/reading-index.json' | relative_url }}?v={{ site.time | date: '%s' }}" hidden>
+    <h2 id="related-title">함께 읽으면 좋은 글</h2>
+    <div class="related-list"></div>
+  </section>
 </article>
+<script src="{{ '/assets/js/reading.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
+<script src="{{ '/assets/js/related-posts.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>

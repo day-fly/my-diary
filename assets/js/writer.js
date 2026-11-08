@@ -4,7 +4,6 @@
   var STORAGE_KEY = "myDiaryWriterConfigV3";
   var OAUTH_PENDING_KEY = "myDiaryWriterOAuthPendingV1";
   var API_BASE = "https://api.github.com";
-  var categoryInput = document.getElementById("post-category");
   var draftStatus = document.getElementById("draft-status");
   var loadedSha = null;
   var loadedFrontMatter = "";
@@ -721,10 +720,7 @@
   function updatePreview() {
     document.getElementById("word-count").textContent =
       bodyInput.value.replace(/\s/g, "").length.toLocaleString("ko-KR") + "자";
-    previewDate.textContent =
-      (categoryInput.value || "기록") +
-      " · " +
-      formatDisplayDate(dateInput.value);
+    previewDate.textContent = formatDisplayDate(dateInput.value);
     previewTitle.textContent = titleInput.value.trim() || "제목을 입력하세요";
     previewBody.innerHTML = renderMarkdownPreview(bodyInput.value);
 
@@ -1082,13 +1078,11 @@
     var keep = false;
     loadedFrontMatter.split("\n").forEach(function (line) {
       if (/^[^\s#][^:]*:/.test(line))
-        keep = !/^(title|date|cover|cover_auto|category):/.test(line);
+        keep = !/^(title|date|cover|cover_auto):/.test(line);
       if (keep) lines.push(line);
     });
     lines.push('title: "' + escapeYaml(payload.title) + '"');
     lines.push("date: " + payload.dateText);
-    if (categoryInput.value)
-      lines.push('category: "' + escapeYaml(categoryInput.value) + '"');
     if (payload.coverUrl)
       lines.push('cover: "' + escapeYaml(payload.coverUrl) + '"');
     if (!autoCoverInput.checked) lines.push("cover_auto: false");
@@ -1126,7 +1120,6 @@
   function resetDraftMode() {
     loadedSha = null;
     loadedFrontMatter = "";
-    categoryInput.value = "";
     currentPostPathInput.value = "";
     titleInput.value = "";
     bodyInput.value = "";
@@ -1394,7 +1387,6 @@
       var parsed = parseMarkdown(markdown);
       loadedSha = meta.sha;
       loadedFrontMatter = parsed.frontMatter || "";
-      setCategory(parsed.data.category || "");
       titleInput.value = parsed.data.title || "";
       coverUrlInput.value = parsed.data.cover || "";
       autoCoverInput.checked = parsed.data.cover_auto !== "false";
@@ -1729,7 +1721,6 @@
       title: titleInput.value,
       body: bodyInput.value,
       date: dateInput.value,
-      category: categoryInput.value,
       cover: coverUrlInput.value,
       autoCover: autoCoverInput.checked,
       path: currentPostPathInput.value,
@@ -1746,7 +1737,6 @@
       titleInput.value,
       bodyInput.value,
       dateInput.value,
-      categoryInput.value,
       coverUrlInput.value,
       autoCoverInput.checked,
     ]);
@@ -1780,17 +1770,6 @@
         "임시저장 실패 · 창을 닫기 전 내용을 복사해 주세요";
     }
   }
-  function setCategory(value) {
-    if (
-      !Array.from(categoryInput.options).some(function (option) {
-        return option.value === value;
-      })
-    ) {
-      var option = new Option(value, value);
-      categoryInput.add(option);
-    }
-    categoryInput.value = value;
-  }
   function restoreDraft() {
     publishedSnapshot = snapshot();
     try {
@@ -1804,7 +1783,6 @@
       titleInput.value = draft.title;
       bodyInput.value = draft.body;
       dateInput.value = draft.date || formatDatetimeLocal(new Date());
-      setCategory(draft.category || "");
       coverUrlInput.value = draft.cover || "";
       autoCoverInput.checked = draft.autoCover !== false;
       currentPostPathInput.value = draft.path || "";
@@ -2201,7 +2179,6 @@
     coverUrlInput,
     autoCoverInput,
     galleryInput,
-    categoryInput,
     appendGalleryInput,
   ].forEach(function (element) {
     element.addEventListener("input", function () {

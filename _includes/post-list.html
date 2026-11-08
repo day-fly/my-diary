@@ -13,32 +13,21 @@
     /></label>
   </div>
   <div class="archive-tools">
-    <div class="filter-tabs" role="group" aria-label="글 종류">
-      {% assign filters = '전체,시,에세이,일기,기록' | split: ',' %} {% for filter in filters %}<button
-        type="button"
-        data-filter="{{ filter }}"
-        aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"
-      >
-        {{ filter }}</button
-      >{% endfor %}
-    </div>
     <span class="result-count" id="result-count" role="status">최신순</span>
   </div>
   <div class="post-list">
-    {% for post in site.posts %} {% assign category = post.category | default: '기록' %}
+    {% for post in site.posts %}
     {% assign card_excerpt = post.excerpt | strip_html | strip %}
     {% if card_excerpt == '' %}{% assign card_excerpt = post.content | strip_html | strip %}{% endif %}
     {% include post-cover.html post=post %}
     <article
       class="post-card"
-      data-category="{{ category | escape }}"
       data-search="{{ post.title | append: ' ' | append: post.content | strip_html | normalize_whitespace | escape }}"
     >
       <a href="{{ post.url | relative_url }}" class="post-card-link">
         <div class="post-card-body">
           <div class="post-meta">
-            <span>{{ category }}</span><span aria-hidden="true">·</span
-            ><time datetime="{{ post.date | date_to_xmlschema }}"
+            <time datetime="{{ post.date | date_to_xmlschema }}"
               >{{ post.date | date: '%Y.%m.%d' }}</time
             >
           </div>
@@ -71,11 +60,11 @@
       페이지예요{% endif %}
     </h3>
     <p>
-      {% if site.posts.size > 0 %}다른 검색어나 글 종류로 찾아보세요.{% else %}오늘의 첫 문장을 남겨보세요.{% endif %}
+      {% if site.posts.size > 0 %}다른 제목이나 문장으로 찾아보세요.{% else %}오늘의 첫 문장을 남겨보세요.{% endif %}
     </p>
     <button class="btn-light" id="reset-search" type="button">
       전체 기록 보기
     </button>
   </div>
 </section>
-<script src="{{ '/assets/js/archive.js' | relative_url }}" defer></script>
+<script src="{{ '/assets/js/archive.js' | relative_url }}?v={{ site.time | date: '%s' }}" defer></script>
