@@ -7,6 +7,9 @@
   var draftStatus = document.getElementById("draft-status");
   var loadedSha = null;
   var loadedFrontMatter = "";
+  var loadedVisibility = "public";
+  var moveTarget = null;
+  var previewRequest = 0;
   var draftSaved = true;
   var busy = false;
   var publishedSnapshot = "";
@@ -35,6 +38,7 @@
 
   var titleInput = document.getElementById("post-title");
   var dateInput = document.getElementById("post-date");
+  var visibilityInput = document.getElementById("post-visibility");
   var coverInput = document.getElementById("cover-image");
   var autoCoverInput = document.getElementById("auto-cover");
   var coverUrlInput = document.getElementById("cover-url");
@@ -401,6 +405,7 @@
 
   function toSafePreviewUrl(rawUrl) {
     var url = extractMarkdownUrl(rawUrl);
+    if (/^diary-(private|pending):/.test(url)) return window.DiaryPrivate ? window.DiaryPrivate.url(url) : "";
     if (!url || /[\u0000-\u001f]/.test(url) || url.startsWith("//")) return "";
     if (!/^(https?:\/\/|\/(?!\/)|\.\.?\/)/i.test(url)) return "";
     return toPreviewAssetUrl(url);
@@ -603,6 +608,9 @@
   }
 
   function setStatus(message, type, allowHtml) {
+    if (window.DiaryAuth && window.DiaryAuth.getState().status !== "authenticated") {
+      message = "작성자 계정으로 로그인해 주세요."; allowHtml = false;
+    }
     statusElement.classList.remove(
       "status-info",
       "status-error",
@@ -758,6 +766,13 @@
       document.getElementById("cover-file-status").textContent =
         "긴 변 1,600px 이내로 줄여 JPG로 저장해요. 작은 사진은 확대하지 않아요.";
     updateCoverCard();
+    var info = ensureConnectionInfo();
+    var request = ++previewRequest;
+    if (info && window.DiaryPrivate) window.DiaryPrivate.preview(info, bodyInput.value + "\n" + coverUrlInput.value).then(function (changed) {
+      if (changed && request === previewRequest && ensureConnectionInfo()) updatePreview();
+    }).catch(function (error) {
+      if (request === previewRequest && ensureConnectionInfo()) document.getElementById("cover-preview-note").textContent = error.message;
+    });
   }
 
   function updateCoverCard() {
@@ -820,6 +835,11 @@
 
   async function githubFetch(url, token, options) {
     var finalOptions = options || {};
+    if (window.DiaryPrivate && url.startsWith(API_BASE + "/repos/" + encodeURIComponent(ownerInput.value) + "/" + encodeURIComponent(document.querySelector(".writer-page").dataset.privateRepo) + "/")) {
+      var privateInfo = { owner: ownerInput.value, repo: repoInput.value, branch: branchInput.value, token: token };
+      window.DiaryPrivate.assert(privateInfo);
+      if (finalOptions.method && finalOptions.method !== "GET") await window.DiaryPrivate.check(privateInfo);
+    }
     if ((finalOptions.method === "PUT" || finalOptions.method === "DELETE") &&
         (!window.DiaryAuth || !window.DiaryAuth.isAuthorized({ owner: ownerInput.value, repo: repoInput.value, branch: branchInput.value, token: token })))
       throw new Error("로그인이 해제되어 저장을 중단했어요. 다시 로그인해 주세요.");
@@ -837,6 +857,7 @@
       method: finalOptions.method || "GET",
       headers: headers,
       body: body,
+      cache: "no-store", credentials: "omit",
     });
 
     var payload = null;
@@ -887,6 +908,7 @@
       encodeURIComponent(branch);
 
     var response = await fetch(url, {
+      cache: "no-store", credentials: "omit",
       headers: {
         Accept: "application/vnd.github+json",
         Authorization: "Bearer " + token,
@@ -947,6 +969,8 @@
     );
     if (!existing || !existing.sha)
       throw new Error("삭제할 파일을 찾지 못했습니다.");
+    if (Object.prototype.hasOwnProperty.call(params, "expectedSha") && existing.sha !== params.expectedSha)
+      throw new Error("다른 곳에서 내용이 변경되었습니다. 최신 글을 다시 불러와 주세요.");
 
     return githubFetch(
       API_BASE +
@@ -977,7 +1001,12 @@
       encodeURIComponent(repo) +
       "/contents/_posts?ref=" +
       encodeURIComponent(branch);
-    var payload = await githubFetch(url, token, { method: "GET" });
+    var payload;
+    try { payload = await githubFetch(url, token, { method: "GET" }); }
+    catch (error) {
+      if (window.DiaryPrivate && window.DiaryPrivate.isPrivate(repo) && error.message === "Not Found") return [];
+      throw error;
+    }
     if (!Array.isArray(payload)) return [];
     return payload
       .filter(function (item) {
@@ -999,13 +1028,14 @@
 
     posts.forEach(function (item) {
       var option = document.createElement("option");
-      option.value = item.path;
+      option.value = (item.visibility === "private" ? "private:" : "") + item.path;
+      option.dataset.visibility = item.visibility || "public";
       var indexed = postIndex.find(function (entry) {
-        return entry.path === item.path;
+        return item.visibility !== "private" && entry.path === item.path;
       });
-      option.textContent = indexed
+      option.textContent = (item.visibility === "private" ? "[비공개] " : "[공개] ") + (item.title || (indexed
         ? indexed.date + " · " + indexed.title
-        : item.name;
+        : item.name));
       postListSelect.appendChild(option);
     });
   }
@@ -1047,9 +1077,9 @@
     });
     imageUploadCache.set(file, {
       destination: destination,
-      url: "/" + imagePath,
+      url: (window.DiaryPrivate && window.DiaryPrivate.isPrivate(repo) ? "diary-private:" : "") + "/" + imagePath,
     });
-    return "/" + imagePath;
+    return imageUploadCache.get(file).url;
   }
 
   async function buildUniquePostPath(
@@ -1124,6 +1154,9 @@
   function resetDraftMode() {
     loadedSha = null;
     loadedFrontMatter = "";
+    loadedVisibility = "public"; moveTarget = null;
+    visibilityInput.value = "public";
+    if (window.DiaryPrivate) window.DiaryPrivate.clear();
     currentPostPathInput.value = "";
     titleInput.value = "";
     bodyInput.value = "";
@@ -1351,6 +1384,20 @@
         info.branch,
         info.token,
       );
+      var accessStatus = document.getElementById("private-access-status");
+      accessStatus.textContent = "";
+      try {
+        var privateInfo = await window.DiaryPrivate.check(info);
+        var privatePosts = await listPosts(privateInfo.owner, privateInfo.repo, privateInfo.branch, privateInfo.token);
+        for (var item of privatePosts) {
+          window.DiaryPrivate.assert(info);
+          var metadata = await getContentMeta(privateInfo.owner, privateInfo.repo, privateInfo.branch, item.path, privateInfo.token);
+          item.visibility = "private";
+          if (metadata && metadata.content) item.title = parseMarkdown(base64ToUtf8(metadata.content)).data.title;
+        }
+        posts = posts.concat(privatePosts);
+      } catch (error) { if (ensureConnectionInfo()) accessStatus.textContent = error.message; }
+      if (!ensureConnectionInfo()) return;
       renderPostOptions(posts);
       setStatus(
         "포스트 목록을 불러왔습니다. (" + posts.length + "개)",
@@ -1374,7 +1421,9 @@
       return;
     }
 
-    var path = postListSelect.value;
+    var selection = postListSelect.value;
+    var visibility = selection.startsWith("private:") ? "private" : "public";
+    var path = selection.replace(/^private:/, "");
     if (!path) {
       setStatus("불러올 포스트를 먼저 선택하세요.", "status-error");
       return;
@@ -1392,6 +1441,7 @@
       loadSelectedPostButton.disabled = true;
       loadSelectedPostButton.textContent = "불러오는 중...";
       setStatus("포스트 내용을 불러오는 중...", "status-info");
+      if (visibility === "private") info = await window.DiaryPrivate.check(info);
 
       var meta = await getContentMeta(
         info.owner,
@@ -1403,6 +1453,10 @@
       if (!meta || !meta.content)
         throw new Error("포스트 내용을 찾지 못했습니다.");
 
+      if (!ensureConnectionInfo()) return;
+      loadedVisibility = visibility;
+      visibilityInput.value = visibility;
+      moveTarget = null;
       var markdown = base64ToUtf8(meta.content);
       var parsed = parseMarkdown(markdown);
       loadedSha = meta.sha;
@@ -1425,7 +1479,7 @@
       updateMode();
       showEditor(true);
       setStatus(
-        "‘" + titleInput.value + "’을 불러왔습니다. 수정 후 발행해 주세요.",
+        "‘" + titleInput.value + "’을 불러왔습니다. 수정 후 저장해 주세요.",
         "status-success",
       );
     } catch (error) {
@@ -1461,7 +1515,9 @@
       deleteButton.textContent = "삭제 중...";
       setStatus("포스트 삭제 중...", "status-info");
 
+      if (loadedVisibility === "private") info = await window.DiaryPrivate.check(info);
       await deleteContent({
+        expectedSha: loadedSha,
         owner: info.owner,
         repo: info.repo,
         branch: info.branch,
@@ -1482,56 +1538,19 @@
     }
   }
 
-  async function handleBodyPaste(event) {
-    var imageFiles = getClipboardImageFiles(event);
-    if (!imageFiles.length) return;
-
-    var info = ensureConnectionInfo();
-    if (!info) {
-      setStatus(
-        "이미지 붙여넣기를 쓰려면 먼저 GitHub 연결(OAuth/PAT)을 완료하세요.",
-        "status-error",
-      );
-      return;
-    }
-
+  function handleBodyPaste(event) {
+    var files = getClipboardImageFiles(event);
+    if (!files.length || !ensureConnectionInfo()) return;
     event.preventDefault();
-
-    var prefixBase = titleInput.value.trim()
-      ? slugify(titleInput.value.trim())
-      : "pasted";
-    var inserted = [];
-
     try {
-      setBusy(true);
-      setStatus("붙여넣은 이미지 업로드 중...", "status-info");
-      var i = 0;
-      for (i = 0; i < imageFiles.length; i += 1) {
-        var url = await uploadImage(
-          info.owner,
-          info.repo,
-          info.branch,
-          info.token,
-          imageFiles[i],
-          prefixBase,
-          i,
-        );
-        inserted.push(
-          "![붙여넣은 이미지 " + (i + 1) + "](" + toMarkdownAssetUrl(url) + ")",
-        );
-      }
-
-      var block = "\n" + inserted.join("\n\n") + "\n";
-      bodyInput.focus();
-      insertTextAtCursor(bodyInput, block);
-      updatePreview();
-      saveDraft();
-      setStatus("붙여넣은 이미지 업로드 완료", "status-success");
-    } catch (error) {
-      setStatus("붙여넣기 업로드 실패: " + error.message, "status-error");
-    } finally {
-      setBusy(false);
-    }
+      files.forEach(validateImage);
+      var inserted = files.map(function (file, index) {
+        return "![붙여넣은 이미지 " + (index + 1) + "](" + window.DiaryPrivate.stage(file) + ")";
+      });
+      insertTextAtCursor(bodyInput, "\n" + inserted.join("\n\n") + "\n");
+      updatePreview(); saveDraft();
+      setStatus("사진을 추가했어요. 저장할 때 선택한 공개 범위에 맞춰 업로드됩니다.", "status-info");
+    } catch (error) { setStatus(error.message, "status-error"); }
   }
 
   async function publishPost() {
@@ -1574,7 +1593,7 @@
     }
     if (
       coverUrlInput.value.trim() &&
-      !toSafePreviewUrl(coverUrlInput.value.trim())
+      !/^diary-private:\/assets\//.test(coverUrlInput.value.trim()) && !toSafePreviewUrl(coverUrlInput.value.trim())
     ) {
       setStatus(
         "표지 주소는 https:// 또는 /assets/로 시작하는 사진 주소를 입력해 주세요.",
@@ -1590,6 +1609,12 @@
       setStatus(error.message, "status-error");
       return;
     }
+    var visibility = visibilityInput.value === "private" ? "private" : "public";
+    var moving = currentPostPathInput.value && loadedVisibility !== visibility;
+    if (moving && !window.confirm(visibility === "private"
+      ? "이 글을 비공개로 전환할까요? 사이트 반영 후 목록과 본문에서 사라집니다. 이미 공개한 사진의 원본 주소는 유지되며, 글의 과거 기록이나 검색 캐시도 남을 수 있습니다."
+      : "이 글의 제목, 본문과 첨부 사진을 누구나 볼 수 있도록 공개할까요?")) return;
+    var sourceInfo = info;
     saveConfig();
     saveDraft();
     setBusy(true);
@@ -1598,6 +1623,14 @@
     setStatus("업로드를 시작합니다...", "status-info");
 
     try {
+      if (visibility === "private") info = await window.DiaryPrivate.check(info);
+      if (loadedVisibility === "private" && currentPostPathInput.value) sourceInfo = await window.DiaryPrivate.check(sourceInfo);
+      var sourceAlreadyRemoved = false;
+      if (currentPostPathInput.value) {
+        var original = await getContentMeta(sourceInfo.owner, sourceInfo.repo, sourceInfo.branch, currentPostPathInput.value, sourceInfo.token);
+        sourceAlreadyRemoved = !original && moving && moveTarget && moveTarget.path === currentPostPathInput.value && moveTarget.visibility === visibility;
+        if (!sourceAlreadyRemoved && (!original || original.sha !== loadedSha)) throw new Error("다른 곳에서 내용이 변경되었습니다. 최신 글을 다시 불러와 주세요.");
+      }
       var publishDate = dateInput.value
         ? new Date(dateInput.value)
         : new Date();
@@ -1672,8 +1705,12 @@
         galleryUrls: galleryUrls,
       });
 
+      markdown = await window.DiaryPrivate.prepare(markdown, info, function (file) {
+        return uploadImage(info.owner, info.repo, info.branch, info.token, file, slug);
+      }, visibility === "private");
+      if (!ensureConnectionInfo()) throw new Error("로그인이 해제되어 저장을 중단했어요.");
       var savedPost = await putContent({
-        expectedSha: currentPath ? loadedSha : null,
+        expectedSha: moving ? (moveTarget && moveTarget.visibility === visibility && moveTarget.path === postPath ? moveTarget.sha : null) : currentPath ? loadedSha : null,
         owner: info.owner,
         repo: info.repo,
         branch: info.branch,
@@ -1683,10 +1720,23 @@
         message: (currentPath ? "Update" : "Add") + " diary post: " + title,
       });
 
+      if (moving) {
+        moveTarget = { path: postPath, visibility: visibility, sha: savedPost.content.sha };
+        saveDraft();
+        try {
+          if (!sourceAlreadyRemoved) await deleteContent({ owner: sourceInfo.owner, repo: sourceInfo.repo, branch: sourceInfo.branch, token: sourceInfo.token, path: currentPath, expectedSha: loadedSha, message: "Move diary post to " + visibility + " storage" });
+        } catch (error) {
+          throw new Error((visibility === "private" ? "비공개 사본은 저장했지만 공개 글이 내려갔는지 확인하지 못했어요. 아직 공개되어 있을 수 있습니다. " : "공개 글은 저장했지만 비공개 사본을 정리하지 못했어요. ") + error.message + " 다시 저장하면 이어서 처리합니다.");
+        }
+      }
+      if (!ensureConnectionInfo()) return;
+      moveTarget = null;
+      loadedVisibility = visibility;
       currentPostPathInput.value = postPath;
       loadedSha = savedPost.content.sha;
       var savedMarkdown = parseMarkdown(markdown);
       loadedFrontMatter = savedMarkdown.frontMatter || "";
+      coverUrlInput.value = savedMarkdown.data.cover || "";
       bodyInput.value = savedMarkdown.body.replace(/^\n+/, "");
       galleryInput.value = "";
       appendGalleryInput.checked = false;
@@ -1705,7 +1755,7 @@
 
       await loadPostList();
       setStatus(
-        '저장 완료! 사이트 반영까지 잠시 걸릴 수 있어요. <a href="' +
+        (visibility === "private" ? '비공개 저장 완료! ' + (moving ? '공개 사이트에서 내려가기까지 잠시 걸릴 수 있어요. ' : '') + '로그인 후 기존 글 관리에서 읽고 수정할 수 있어요. ' : '저장 완료! 사이트 반영까지 잠시 걸릴 수 있어요. ') + '<a href="' +
           githubFileUrl +
           '" target="_blank" rel="noopener">GitHub에서 파일 보기</a>',
         "status-success",
@@ -1738,6 +1788,9 @@
   }
   function draftData() {
     return {
+      visibility: visibilityInput.value,
+      loadedVisibility: loadedVisibility,
+      moveTarget: moveTarget,
       title: titleInput.value,
       body: bodyInput.value,
       date: dateInput.value,
@@ -1759,6 +1812,7 @@
       dateInput.value,
       coverUrlInput.value,
       autoCoverInput.checked,
+      visibilityInput.value,
     ]);
   }
   function hasChanges() {
@@ -1775,7 +1829,14 @@
   function saveDraft() {
     if (!workspaceInitialized) return;
     try {
-      localStorage.setItem(draftKey(), JSON.stringify(draftData()));
+      var privateDraft = visibilityInput.value === "private" || loadedVisibility === "private";
+      if (privateDraft) {
+        localStorage.removeItem(draftKey());
+        sessionStorage.setItem(draftKey() + ":private", JSON.stringify(draftData()));
+      } else {
+        sessionStorage.removeItem(draftKey() + ":private");
+        localStorage.setItem(draftKey(), JSON.stringify(draftData()));
+      }
       draftSaved = true;
       draftStatus.textContent =
         "임시저장됨 · " +
@@ -1783,8 +1844,9 @@
           hour: "2-digit",
           minute: "2-digit",
         });
-      if (coverInput.files.length || galleryInput.files.length)
-        draftStatus.textContent += " · 사진은 다시 선택 필요";
+      if (privateDraft) draftStatus.textContent += " · 이 탭에서만 보관";
+      if (coverInput.files.length || galleryInput.files.length || (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value)))
+        draftStatus.textContent += " · 다시 열 때 사진 재첨부 필요";
     } catch (_) {
       draftSaved = false;
       draftStatus.textContent =
@@ -1794,13 +1856,16 @@
   function restoreDraft() {
     publishedSnapshot = snapshot();
     try {
-      var draft = JSON.parse(localStorage.getItem(draftKey()) || "null");
+      var draft = JSON.parse(sessionStorage.getItem(draftKey() + ":private") || localStorage.getItem(draftKey()) || "null");
       if (
         !draft ||
         typeof draft.body !== "string" ||
         typeof draft.title !== "string"
       )
         return;
+      visibilityInput.value = draft.visibility === "private" ? "private" : "public";
+      loadedVisibility = draft.loadedVisibility === "private" ? "private" : "public";
+      moveTarget = draft.moveTarget || null;
       titleInput.value = draft.title;
       bodyInput.value = draft.body;
       dateInput.value = draft.date || formatDatetimeLocal(new Date());
@@ -1822,9 +1887,11 @@
     }
   }
   function updateMode() {
-    publishButton.textContent = currentPostPathInput.value
-      ? "수정 발행"
-      : "발행하기 ↗";
+    var privatePost = visibilityInput.value === "private";
+    publishButton.textContent = privatePost ? (currentPostPathInput.value && loadedVisibility === "public" ? "비공개로 전환" : "비공개 저장") : currentPostPathInput.value && loadedVisibility === "private" ? "공개로 전환 ↗" : currentPostPathInput.value ? "수정 발행" : "발행하기 ↗";
+    document.getElementById("visibility-help").textContent = privatePost
+      ? "비공개 글과 새 사진은 나만 보는 저장 공간에 보관됩니다. 임시글은 이 탭에서만 유지되며 로그아웃하면 지워지니 먼저 비공개 저장해 주세요." + (currentPostPathInput.value && loadedVisibility === "public" ? " 이미 공개한 사진 주소와 글의 과거 기록·검색 캐시는 남을 수 있습니다." : "")
+      : "발행하면 제목, 본문과 사진을 누구나 읽을 수 있습니다.";
     deleteButton.disabled = !currentPostPathInput.value;
   }
   function updateConnectionState() {
@@ -1936,6 +2003,8 @@
       (!draftSaved && hasChanges()) ||
       coverInput.files.length ||
       galleryInput.files.length ||
+      (visibilityInput.value === "private" && hasChanges()) ||
+      (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value)) ||
       document.getElementById("profile-photo").files.length ||
       JSON.stringify(readProfile()) !== profileBaseline
     ) {
@@ -2195,6 +2264,7 @@
   [
     titleInput,
     dateInput,
+    visibilityInput,
     bodyInput,
     coverInput,
     coverUrlInput,
@@ -2204,10 +2274,12 @@
   ].forEach(function (element) {
     element.addEventListener("input", function () {
       updatePreview();
+      updateMode();
       saveDraft();
     });
     element.addEventListener("change", function () {
       updatePreview();
+      updateMode();
       saveDraft();
     });
   });
@@ -2233,6 +2305,21 @@
       document.getElementById("connection").open = false;
     } else {
       if (workspaceInitialized && hasChanges()) saveDraft();
+      var authStatus = window.DiaryAuth && window.DiaryAuth.getState().status;
+      if (authStatus !== "checking" && workspaceInitialized) {
+        if (visibilityInput.value === "private" || loadedVisibility === "private") {
+          try { sessionStorage.removeItem(draftKey() + ":private"); } catch (_) {}
+          titleInput.value = ""; bodyInput.value = ""; coverUrlInput.value = "";
+          coverInput.value = ""; galleryInput.value = ""; currentPostPathInput.value = "";
+          loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null;
+          visibilityInput.value = "public"; previewRequest++;
+          previewTitle.textContent = ""; previewBody.innerHTML = ""; previewCover.innerHTML = ""; previewGallery.innerHTML = "";
+          document.getElementById("cover-card-preview").removeAttribute("src");
+        }
+        if (window.DiaryPrivate) window.DiaryPrivate.clear();
+        renderPostOptions([]); statusElement.textContent = "";
+        workspaceInitialized = false;
+      }
       document.getElementById("connection").open = true;
       if (window.DiaryAuth && window.DiaryAuth.getState().status === "guest") tokenInput.value = "";
     }

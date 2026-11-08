@@ -962,6 +962,7 @@ body:not([data-author-state="authenticated"]) .writer-page { max-width: 620px; }
   margin-bottom: 22px;
   max-width: 580px;
 }
+.writing-sheet .visibility-help { margin: -8px 32px 20px; max-width: 680px; }
 .editor-meta label {
   font-size: 10px;
   flex-direction: row;
