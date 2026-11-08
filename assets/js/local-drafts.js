@@ -20,7 +20,7 @@
     });
     return claiming;
   }
-  window.addEventListener('pagehide',()=>{releaseSlot?.();});
+  window.addEventListener('pagehide',()=>{releaseSlot?.();releaseSlot=null;claiming=null;});
   function open() {
     if (!opening) opening = new Promise((resolve, reject) => {
       if (!window.indexedDB) return reject(new Error('이 브라우저에서는 사진 자동 임시저장을 사용할 수 없어요. 보관함 저장을 눌러 주세요.'));
@@ -54,6 +54,7 @@
   function write(data, files, cover, sensitive) {
     const version=epoch;
     return enqueue(async()=>{
+      await claimSlot();
       const db=await open();assert(version);
       const tx=db.transaction(['drafts','files'],'readwrite'), completed=done(tx), store=tx.objectStore('files');
       const added=[], refs=[];
