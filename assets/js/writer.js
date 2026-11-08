@@ -10,6 +10,11 @@
   var loadedVisibility = "public";
   var moveTarget = null;
   var previewRequest = 0;
+  var savedGallery = [];
+  var cloudDraftId = null, cloudDraftSha = null, cloudSnapshot = "";
+  var privateWorkspace = false;
+  var libraryDrafts = [], libraryVersion = 0, libraryLoaded = false, writerEpoch = 0;
+  var publicTitleCache = new Map();
   var draftSaved = true;
   var busy = false;
   var publishedSnapshot = "";
@@ -747,6 +752,12 @@
       previewCover.appendChild(existingCover);
     }
 
+    savedGallery.forEach(function (url, index) {
+      var image = document.createElement("img"); image.alt = "보관된 본문 사진 " + (index + 1);
+      var source = toSafePreviewUrl(url); if (source) image.src = source;
+      previewGallery.appendChild(image);
+    });
+    renderSavedPhotos();
     if (galleryInput.files && galleryInput.files.length > 0) {
       Array.prototype.forEach.call(galleryInput.files, function (file, index) {
         var objectUrl = URL.createObjectURL(file);
@@ -768,7 +779,7 @@
     updateCoverCard();
     var info = ensureConnectionInfo();
     var request = ++previewRequest;
-    if (info && window.DiaryPrivate) window.DiaryPrivate.preview(info, bodyInput.value + "\n" + coverUrlInput.value).then(function (changed) {
+    if (info && window.DiaryPrivate) window.DiaryPrivate.preview(info, bodyInput.value + "\n" + coverUrlInput.value + "\n" + savedGallery.join("\n")).then(function (changed) {
       if (changed && request === previewRequest && ensureConnectionInfo()) updatePreview();
     }).catch(function (error) {
       if (request === previewRequest && ensureConnectionInfo()) document.getElementById("cover-preview-note").textContent = error.message;
@@ -783,7 +794,7 @@
       source = firstBodyImage
         ? firstBodyImage.getAttribute("src")
         : appendGalleryInput.checked
-          ? galleryObjectUrls[0]
+          ? toSafePreviewUrl(savedGallery[0] || "") || galleryObjectUrls[0]
           : "";
       automatic = !!source;
     }
@@ -1038,6 +1049,10 @@
         : item.name));
       postListSelect.appendChild(option);
     });
+    if (window.DiaryLibrary) window.DiaryLibrary.setItems(posts.map(function (item) {
+      var indexed = postIndex.find(function (post) { return item.visibility !== "private" && post.path === item.path; });
+      return { kind:item.visibility || "public", path:item.path, title:item.title || (indexed && indexed.title) || item.name, date:(indexed && indexed.date) || (item.path.match(/\d{4}-\d{2}-\d{2}/) || [""])[0].replace(/-/g,"."), sortDate:((indexed && indexed.date) || (item.path.match(/\d{4}-\d{2}-\d{2}/) || [""])[0]).replace(/\./g,"-") };
+    }).concat(libraryDrafts));
   }
 
   async function uploadImage(owner, repo, branch, token, file, prefix, index) {
@@ -1111,11 +1126,12 @@
     var keep = false;
     loadedFrontMatter.split("\n").forEach(function (line) {
       if (/^[^\s#][^:]*:/.test(line))
-        keep = !/^(title|date|cover|cover_auto):/.test(line);
+        keep = !/^(title|date|cover|cover_auto|diary_revision):/.test(line);
       if (keep) lines.push(line);
     });
     lines.push('title: "' + escapeYaml(payload.title) + '"');
     lines.push("date: " + payload.dateText);
+    if (payload.revision) lines.push('diary_revision: "' + payload.revision + '"');
     if (payload.coverUrl)
       lines.push('cover: "' + escapeYaml(payload.coverUrl) + '"');
     if (!autoCoverInput.checked) lines.push("cover_auto: false");
@@ -1155,6 +1171,7 @@
     loadedSha = null;
     loadedFrontMatter = "";
     loadedVisibility = "public"; moveTarget = null;
+    savedGallery = []; cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; privateWorkspace = false;
     visibilityInput.value = "public";
     if (window.DiaryPrivate) window.DiaryPrivate.clear();
     currentPostPathInput.value = "";
@@ -1364,7 +1381,9 @@
     }
   }
 
-  async function loadPostList() {
+  async function loadPostList(quiet) {
+    quiet = quiet === true;
+    var request = ++libraryVersion;
     var info = ensureConnectionInfo();
     if (!info) {
       setStatus(
@@ -1377,15 +1396,30 @@
     try {
       loadPostsButton.disabled = true;
       loadPostsButton.textContent = "조회 중...";
-      setStatus("포스트 목록을 불러오는 중...", "status-info");
+      if (!quiet) setStatus("저장된 글과 임시글을 불러오는 중…", "status-info");
       var posts = await listPosts(
         info.owner,
         info.repo,
         info.branch,
         info.token,
       );
+      for (var offset = 0; offset < posts.length; offset += 6) {
+        if (!window.DiaryAuth.isAuthorized(info) || request !== libraryVersion) return;
+        await Promise.all(posts.slice(offset, offset + 6).map(async function (item) {
+          var cached = publicTitleCache.get(item.path);
+          if (item.sha && cached && cached.sha === item.sha) { item.title = cached.title; return; }
+          var meta = await getContentMeta(info.owner, info.repo, info.branch, item.path, info.token);
+          if (!window.DiaryAuth.isAuthorized(info) || request !== libraryVersion) return;
+          if (meta && meta.content) {
+            item.title = parseMarkdown(base64ToUtf8(meta.content)).data.title;
+            publicTitleCache.set(item.path, {sha:meta.sha, title:item.title});
+          }
+        }));
+      }
+      if (!window.DiaryAuth.isAuthorized(info) || request !== libraryVersion) return;
       var accessStatus = document.getElementById("private-access-status");
       accessStatus.textContent = "";
+      libraryDrafts = [];
       try {
         var privateInfo = await window.DiaryPrivate.check(info);
         var privatePosts = await listPosts(privateInfo.owner, privateInfo.repo, privateInfo.branch, privateInfo.token);
@@ -1396,10 +1430,24 @@
           if (metadata && metadata.content) item.title = parseMarkdown(base64ToUtf8(metadata.content)).data.title;
         }
         posts = posts.concat(privatePosts);
+        var draftFiles = await getContentMeta(privateInfo.owner, privateInfo.repo, privateInfo.branch, "_diary_drafts", privateInfo.token) || [];
+        if (!Array.isArray(draftFiles)) throw new Error("임시글 목록을 읽을 수 없어요.");
+        var drafts = [];
+        for (var file of draftFiles.filter(function (file) { return /^[a-f0-9]{24}\.json$/.test(file.name); })) {
+          window.DiaryPrivate.assert(info);
+          var meta = await getContentMeta(privateInfo.owner, privateInfo.repo, privateInfo.branch, file.path, privateInfo.token);
+          if (!meta || !meta.content) continue;
+          try {
+            var data = validateCloudDraft(JSON.parse(base64ToUtf8(meta.content)));
+            drafts.push({ kind:"draft", id:file.name.replace(/\.json$/, ""), sha:meta.sha, title:data.title || "제목 없는 임시글", date:data.updatedAt ? new Date(data.updatedAt).toLocaleDateString("ko-KR", {timeZone:"Asia/Seoul"}) : "", sortDate:data.updatedAt || "" });
+          } catch (_) { accessStatus.textContent = "읽을 수 없는 임시글이 있어요. 다른 기록은 계속 이용할 수 있습니다."; }
+        }
+        if (request === libraryVersion) libraryDrafts = drafts;
       } catch (error) { if (ensureConnectionInfo()) accessStatus.textContent = error.message; }
-      if (!ensureConnectionInfo()) return;
+      if (!ensureConnectionInfo() || request !== libraryVersion) return;
+      libraryLoaded = true;
       renderPostOptions(posts);
-      setStatus(
+      if (!quiet) setStatus(
         "포스트 목록을 불러왔습니다. (" + posts.length + "개)",
         "status-success",
       );
@@ -1430,7 +1478,7 @@
     }
 
     if (
-      hasChanges() &&
+      hasUnstoredChanges() &&
       !window.confirm(
         "현재 임시글 대신 선택한 글을 불러올까요? 필요한 내용은 먼저 복사해 주세요.",
       )
@@ -1454,6 +1502,7 @@
         throw new Error("포스트 내용을 찾지 못했습니다.");
 
       if (!ensureConnectionInfo()) return;
+      savedGallery = []; cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; privateWorkspace = visibility === "private";
       loadedVisibility = visibility;
       visibilityInput.value = visibility;
       moveTarget = null;
@@ -1482,6 +1531,7 @@
         "‘" + titleInput.value + "’을 불러왔습니다. 수정 후 저장해 주세요.",
         "status-success",
       );
+      return true;
     } catch (error) {
       setStatus("불러오기 실패: " + error.message, "status-error");
     } finally {
@@ -1516,7 +1566,7 @@
       setStatus("포스트 삭제 중...", "status-info");
 
       if (loadedVisibility === "private") info = await window.DiaryPrivate.check(info);
-      await deleteContent({
+      var deleted = await deleteContent({
         expectedSha: loadedSha,
         owner: info.owner,
         repo: info.repo,
@@ -1526,6 +1576,7 @@
         message: "Delete diary post: " + path,
       });
 
+      if (loadedVisibility === "public" && window.DiaryPublication) window.DiaryPublication.start({path:path,visibility:"private",commit:deleted && deleted.commit && deleted.commit.sha}, ensureConnectionInfo());
       if (currentPostPathInput.value.trim() === path) resetDraftMode();
       await loadPostList();
       setStatus("삭제 완료: " + path, "status-success");
@@ -1553,6 +1604,125 @@
     } catch (error) { setStatus(error.message, "status-error"); }
   }
 
+  function cloudDraftPath(id) {
+    if (!/^[a-f0-9]{24}$/.test(id)) throw new Error("임시글 정보를 다시 불러와 주세요.");
+    return "_diary_drafts/" + id + ".json";
+  }
+  function newCloudDraftId() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(12)), function (n) { return n.toString(16).padStart(2, "0"); }).join("");
+  }
+  function validateCloudDraft(data) {
+    if (!data || data.version !== 1 || typeof data.title !== "string" || typeof data.body !== "string" || !Array.isArray(data.galleryRefs)) throw new Error("이 임시글의 저장 형식을 읽을 수 없어요.");
+    if (data.path && !/^_posts\/[A-Za-z0-9_.-]+\.md$/.test(data.path)) throw new Error("임시글의 원본 글 정보가 올바르지 않아요.");
+    if (data.galleryRefs.some(function (url) { return typeof url !== "string" || !/^diary-private:\/assets\/photos\/[A-Za-z0-9_.-]+\.(png|jpe?g|webp|gif)$/i.test(url); })) throw new Error("임시글의 사진 정보를 읽을 수 없어요.");
+    return data;
+  }
+  function renderSavedPhotos() {
+    var box = document.getElementById("saved-draft-photos");
+    box.replaceChildren(); box.hidden = !savedGallery.length;
+    savedGallery.forEach(function (url, index) {
+      var frame = document.createElement("div");
+      var image = document.createElement("img"); image.alt = "보관된 본문 사진 " + (index + 1);
+      var source = toSafePreviewUrl(url); if (source) image.src = source;
+      var remove = document.createElement("button"); remove.type = "button"; remove.className = "btn-light";
+      remove.textContent = "사진 " + (index + 1) + " 빼기"; remove.disabled = busy;
+      remove.addEventListener("click", function () { savedGallery.splice(index, 1); updatePreview(); saveDraft(); });
+      frame.append(image, remove); box.appendChild(frame);
+    });
+  }
+  async function saveCloudDraft(asCopy) {
+    if (busy) return;
+    var info = ensureConnectionInfo(); if (!info) return;
+    if (!titleInput.value.trim() && !bodyInput.value.trim() && !coverInput.files.length && !galleryInput.files.length && !savedGallery.length) {
+      setStatus("제목이나 본문을 적거나 사진을 추가한 뒤 보관해 주세요.", "status-info"); return;
+    }
+    var epoch = writerEpoch;
+    var id = asCopy || !cloudDraftId ? newCloudDraftId() : cloudDraftId;
+    var expectedSha = asCopy ? null : cloudDraftSha;
+    saveDraft(); setBusy(true);
+    setStatus("사진과 글을 비공개 보관함에 저장하고 있어요…", "status-info");
+    try {
+      var target = await window.DiaryPrivate.check(info);
+      var current = await getContentMeta(target.owner, target.repo, target.branch, cloudDraftPath(id), target.token);
+      if ((current ? current.sha : null) !== expectedSha) throw new Error("다른 기기에서 이 임시글이 변경됐어요. 새 임시글로 보관하거나 최신 내용을 다시 불러와 주세요.");
+      var data = draftData();
+      var upload = function (file) { return uploadImage(target.owner, target.repo, target.branch, target.token, file, "draft-" + id); };
+      Array.from(coverInput.files).concat(Array.from(galleryInput.files)).forEach(validateImage);
+      if (coverInput.files[0]) data.cover = await upload((await window.DiaryCoverImage.prepare(coverInput.files[0])).file);
+      data.body = await window.DiaryPrivate.prepare(data.body, target, upload, true);
+      data.cover = await window.DiaryPrivate.prepare(data.cover, target, upload, true);
+      data.galleryRefs = savedGallery.slice();
+      for (var file of Array.from(galleryInput.files)) data.galleryRefs.push(await upload(file));
+      data.version = 1; data.hasFiles = false; data.privateWorkspace = true;
+      delete data.cloudDraftId; delete data.cloudDraftSha; delete data.cloudSnapshot;
+      if (asCopy) { data.path = ""; data.sha = null; data.frontMatter = ""; data.loadedVisibility = "public"; data.moveTarget = null; data.publishedSnapshot = ""; }
+      var text = JSON.stringify(data, null, 2) + "\n";
+      if (new TextEncoder().encode(text).length > 900000) throw new Error("임시글이 너무 길어요. 여러 글로 나눠 보관해 주세요.");
+      window.DiaryPrivate.assert(info); if (epoch !== writerEpoch) return;
+      var saved = await putContent({ owner:target.owner, repo:target.repo, branch:target.branch, token:target.token, path:cloudDraftPath(id), expectedSha:expectedSha, contentBase64:utf8ToBase64(text), message:"Save private diary draft" });
+      if (!ensureConnectionInfo() || epoch !== writerEpoch) return;
+      cloudDraftId = id; cloudDraftSha = saved.content.sha; privateWorkspace = true;
+      bodyInput.value = data.body; coverUrlInput.value = data.cover; savedGallery = data.galleryRefs;
+      coverInput.value = ""; galleryInput.value = "";
+      if (asCopy) { currentPostPathInput.value = ""; loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null; publishedSnapshot = ""; }
+      cloudSnapshot = snapshot(); saveDraft(); updatePreview();
+      await loadPostList(true);
+      if (epoch !== writerEpoch || !ensureConnectionInfo()) return;
+      draftStatus.textContent = "보관함에 저장됨 · 다른 기기에서 이어 쓸 수 있어요";
+      setStatus("보관함에 저장했어요. 사진과 글을 다른 기기에서도 이어 쓸 수 있습니다.", "status-success");
+    } catch (error) { setStatus("보관함 저장 실패: " + error.message + " 현재 작성 내용은 그대로 남아 있어요.", "status-error"); }
+    finally { setBusy(false); }
+  }
+  async function readCloudDraft(item) {
+    if (busy) return;
+    var info = ensureConnectionInfo(); if (!info) return;
+    if (hasUnstoredChanges() && !window.confirm("보관함의 글을 불러올까요? 현재 글도 남기려면 먼저 보관함에 저장해 주세요.")) return;
+    var epoch = writerEpoch;
+    setBusy(true);
+    try {
+      var target = await window.DiaryPrivate.check(info);
+      var meta = await getContentMeta(target.owner, target.repo, target.branch, cloudDraftPath(item.id), target.token);
+      if (!meta || !meta.content) throw new Error("임시글이 삭제되었거나 이동했어요. 목록을 새로고침해 주세요.");
+      var data = validateCloudDraft(JSON.parse(base64ToUtf8(meta.content)));
+      if (!ensureConnectionInfo() || epoch !== writerEpoch) return;
+      titleInput.value = data.title; bodyInput.value = data.body; dateInput.value = data.date || formatDatetimeLocal(new Date());
+      visibilityInput.value = data.visibility === "private" ? "private" : "public";
+      loadedVisibility = data.loadedVisibility === "private" ? "private" : "public";
+      currentPostPathInput.value = data.path || ""; loadedSha = data.sha || null;
+      loadedFrontMatter = typeof data.frontMatter === "string" ? data.frontMatter : ""; moveTarget = data.moveTarget || null;
+      coverUrlInput.value = data.cover || ""; autoCoverInput.checked = data.autoCover !== false;
+      appendGalleryInput.checked = data.appendGallery !== false; savedGallery = data.galleryRefs;
+      coverInput.value = ""; galleryInput.value = ""; cloudDraftId = item.id; cloudDraftSha = meta.sha; privateWorkspace = true;
+      publishedSnapshot = data.publishedSnapshot || ""; cloudSnapshot = snapshot();
+      saveDraft(); updatePreview(); updateMode(); showEditor(true);
+      document.querySelector(".writing-sheet").scrollIntoView({ block:"start", behavior:"smooth" });
+      setStatus("보관함에서 사진과 글을 불러왔어요. 이어서 작성해 주세요.", "status-success");
+    } catch (error) { setStatus("임시글 불러오기 실패: " + error.message, "status-error"); }
+    finally { setBusy(false); }
+  }
+  async function deleteCloudDraft(item) {
+    if (busy || !window.confirm("이 임시글을 보관함에서 삭제할까요? 발행한 글은 그대로 유지됩니다.")) return;
+    var info = ensureConnectionInfo(); if (!info) return;
+    setBusy(true);
+    try {
+      var target = await window.DiaryPrivate.check(info);
+      await deleteContent({ owner:target.owner, repo:target.repo, branch:target.branch, token:target.token, path:cloudDraftPath(item.id), expectedSha:item.sha, message:"Remove private diary draft" });
+      if (!ensureConnectionInfo()) return;
+      if (cloudDraftId === item.id) { cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; saveDraft(); }
+      await loadPostList(true); setStatus("임시글을 보관함에서 삭제했어요.", "status-success");
+    } catch (error) { setStatus("임시글 삭제 실패: " + error.message, "status-error"); }
+    finally { setBusy(false); }
+  }
+  async function removePublishedDraft(info) {
+    if (!cloudDraftId) return "";
+    try {
+      var target = await window.DiaryPrivate.check(info);
+      await deleteContent({ owner:target.owner, repo:target.repo, branch:target.branch, token:target.token, path:cloudDraftPath(cloudDraftId), expectedSha:cloudDraftSha, message:"Archive published diary draft" });
+      return "";
+    } catch (_) { return " 보관함의 임시글은 남겨 두었어요. 글 관리에서 확인할 수 있습니다."; }
+    finally { cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; }
+  }
+
   async function publishPost() {
     if (busy) return;
     var info = ensureConnectionInfo();
@@ -1574,7 +1744,7 @@
       return;
     }
 
-    if (!body && !(galleryInput.files && galleryInput.files.length)) {
+    if (!body && !(appendGallery && ((galleryInput.files && galleryInput.files.length) || savedGallery.length))) {
       setStatus("본문을 쓰거나 사진을 추가해 주세요.", "status-error");
       bodyInput.focus();
       return;
@@ -1623,6 +1793,11 @@
     setStatus("업로드를 시작합니다...", "status-info");
 
     try {
+      if (cloudDraftId) {
+        var draftInfo = await window.DiaryPrivate.check(info);
+        var remoteDraft = await getContentMeta(draftInfo.owner, draftInfo.repo, draftInfo.branch, cloudDraftPath(cloudDraftId), draftInfo.token);
+        if (!remoteDraft || remoteDraft.sha !== cloudDraftSha) throw new Error("다른 기기에서 임시글이 변경됐어요. 보관함에서 다시 불러오거나 새 임시글로 보관한 뒤 발행해 주세요.");
+      }
       if (visibility === "private") info = await window.DiaryPrivate.check(info);
       if (loadedVisibility === "private" && currentPostPathInput.value) sourceInfo = await window.DiaryPrivate.check(sourceInfo);
       var sourceAlreadyRemoved = false;
@@ -1651,7 +1826,8 @@
       }
 
       var coverUrl = coverUrlInput.value.trim();
-      var galleryUrls = [];
+      var galleryUrls = savedGallery.slice();
+      var revision = newCloudDraftId();
 
       if (coverInput.files && coverInput.files[0]) {
         setStatus("표지 사진 업로드 중...", "status-info");
@@ -1698,6 +1874,7 @@
 
       var markdown = buildMarkdown({
         title: title,
+        revision: revision,
         dateText: formatFrontMatterDate(publishDate),
         coverUrl: coverUrl,
         body: body,
@@ -1708,6 +1885,7 @@
       markdown = await window.DiaryPrivate.prepare(markdown, info, function (file) {
         return uploadImage(info.owner, info.repo, info.branch, info.token, file, slug);
       }, visibility === "private");
+      if (visibility === "public") markdown = normalizeBodyAssetUrls(markdown);
       if (!ensureConnectionInfo()) throw new Error("로그인이 해제되어 저장을 중단했어요.");
       var savedPost = await putContent({
         expectedSha: moving ? (moveTarget && moveTarget.visibility === visibility && moveTarget.path === postPath ? moveTarget.sha : null) : currentPath ? loadedSha : null,
@@ -1720,18 +1898,29 @@
         message: (currentPath ? "Update" : "Add") + " diary post: " + title,
       });
 
+      var removalCommit = "";
       if (moving) {
         moveTarget = { path: postPath, visibility: visibility, sha: savedPost.content.sha };
         saveDraft();
         try {
-          if (!sourceAlreadyRemoved) await deleteContent({ owner: sourceInfo.owner, repo: sourceInfo.repo, branch: sourceInfo.branch, token: sourceInfo.token, path: currentPath, expectedSha: loadedSha, message: "Move diary post to " + visibility + " storage" });
+          if (!sourceAlreadyRemoved) {
+            var removed = await deleteContent({ owner: sourceInfo.owner, repo: sourceInfo.repo, branch: sourceInfo.branch, token: sourceInfo.token, path: currentPath, expectedSha: loadedSha, message: "Move diary post to " + visibility + " storage" });
+            removalCommit = removed && removed.commit ? removed.commit.sha : "";
+          }
         } catch (error) {
           throw new Error((visibility === "private" ? "비공개 사본은 저장했지만 공개 글이 내려갔는지 확인하지 못했어요. 아직 공개되어 있을 수 있습니다. " : "공개 글은 저장했지만 비공개 사본을 정리하지 못했어요. ") + error.message + " 다시 저장하면 이어서 처리합니다.");
         }
       }
       if (!ensureConnectionInfo()) return;
+      var draftNotice = await removePublishedDraft(ensureConnectionInfo());
+      if (!ensureConnectionInfo()) return;
+      if (window.DiaryPublication) {
+        if (visibility === "public" || moving) window.DiaryPublication.start({path:postPath, visibility:visibility, revision:revision, commit:visibility === "public" ? savedPost.commit && savedPost.commit.sha : removalCommit}, ensureConnectionInfo());
+        else window.DiaryPublication.privateSaved();
+      }
       moveTarget = null;
       loadedVisibility = visibility;
+      savedGallery = [];
       currentPostPathInput.value = postPath;
       loadedSha = savedPost.content.sha;
       var savedMarkdown = parseMarkdown(markdown);
@@ -1753,11 +1942,11 @@
         "/" +
         postPath;
 
-      await loadPostList();
+      await loadPostList(true);
       setStatus(
         (visibility === "private" ? '비공개 저장 완료! ' + (moving ? '공개 사이트에서 내려가기까지 잠시 걸릴 수 있어요. ' : '') + '로그인 후 기존 글 관리에서 읽고 수정할 수 있어요. ' : '저장 완료! 사이트 반영까지 잠시 걸릴 수 있어요. ') + '<a href="' +
           githubFileUrl +
-          '" target="_blank" rel="noopener">GitHub에서 파일 보기</a>',
+          '" target="_blank" rel="noopener">GitHub에서 파일 보기</a>' + draftNotice,
         "status-success",
         true,
       );
@@ -1788,6 +1977,8 @@
   }
   function draftData() {
     return {
+      cloudDraftId: cloudDraftId, cloudDraftSha: cloudDraftSha, cloudSnapshot: cloudSnapshot, privateWorkspace: privateWorkspace,
+      galleryRefs: savedGallery.slice(),
       visibility: visibilityInput.value,
       loadedVisibility: loadedVisibility,
       moveTarget: moveTarget,
@@ -1813,12 +2004,15 @@
       coverUrlInput.value,
       autoCoverInput.checked,
       visibilityInput.value,
+      savedGallery, appendGalleryInput.checked,
     ]);
   }
   function hasChanges() {
     return (
       (!!titleInput.value ||
         !!bodyInput.value ||
+        !!coverUrlInput.value ||
+        !!savedGallery.length ||
         !!coverInput.files.length ||
         !!galleryInput.files.length) &&
       (snapshot() !== publishedSnapshot ||
@@ -1826,10 +2020,13 @@
         galleryInput.files.length)
     );
   }
+  function hasUnstoredChanges() {
+    return hasChanges() && (snapshot() !== cloudSnapshot || coverInput.files.length || galleryInput.files.length);
+  }
   function saveDraft() {
     if (!workspaceInitialized) return;
     try {
-      var privateDraft = visibilityInput.value === "private" || loadedVisibility === "private";
+      var privateDraft = privateWorkspace || visibilityInput.value === "private" || loadedVisibility === "private";
       if (privateDraft) {
         localStorage.removeItem(draftKey());
         sessionStorage.setItem(draftKey() + ":private", JSON.stringify(draftData()));
@@ -1845,6 +2042,7 @@
           minute: "2-digit",
         });
       if (privateDraft) draftStatus.textContent += " · 이 탭에서만 보관";
+      if (cloudDraftId) draftStatus.textContent += snapshot() === cloudSnapshot ? " · 보관함에도 저장됨" : " · 보관함 저장 필요";
       if (coverInput.files.length || galleryInput.files.length || (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value)))
         draftStatus.textContent += " · 다시 열 때 사진 재첨부 필요";
     } catch (_) {
@@ -1863,6 +2061,10 @@
         typeof draft.title !== "string"
       )
         return;
+      cloudDraftId = /^[a-f0-9]{24}$/.test(draft.cloudDraftId || "") ? draft.cloudDraftId : null;
+      cloudDraftSha = cloudDraftId ? draft.cloudDraftSha : null; cloudSnapshot = draft.cloudSnapshot || "";
+      privateWorkspace = !!draft.privateWorkspace || !!cloudDraftId;
+      savedGallery = Array.isArray(draft.galleryRefs) ? draft.galleryRefs.filter(function (url) { return typeof url === "string" && /^diary-private:\/assets\//.test(url); }) : [];
       visibilityInput.value = draft.visibility === "private" ? "private" : "public";
       loadedVisibility = draft.loadedVisibility === "private" ? "private" : "public";
       moveTarget = draft.moveTarget || null;
@@ -1890,7 +2092,7 @@
     var privatePost = visibilityInput.value === "private";
     publishButton.textContent = privatePost ? (currentPostPathInput.value && loadedVisibility === "public" ? "비공개로 전환" : "비공개 저장") : currentPostPathInput.value && loadedVisibility === "private" ? "공개로 전환 ↗" : currentPostPathInput.value ? "수정 발행" : "발행하기 ↗";
     document.getElementById("visibility-help").textContent = privatePost
-      ? "비공개 글과 새 사진은 나만 보는 저장 공간에 보관됩니다. 임시글은 이 탭에서만 유지되며 로그아웃하면 지워지니 먼저 비공개 저장해 주세요." + (currentPostPathInput.value && loadedVisibility === "public" ? " 이미 공개한 사진 주소와 글의 과거 기록·검색 캐시는 남을 수 있습니다." : "")
+      ? "비공개 글과 새 사진은 나만 보는 저장 공간에 보관됩니다. 작성 중인 글은 보관함 저장을 누르면 다른 기기에서도 이어 쓸 수 있어요." + (currentPostPathInput.value && loadedVisibility === "public" ? " 이미 공개한 사진 주소와 글의 과거 기록·검색 캐시는 남을 수 있습니다." : "")
       : "발행하면 제목, 본문과 사진을 누구나 읽을 수 있습니다.";
     deleteButton.disabled = !currentPostPathInput.value;
   }
@@ -1919,6 +2121,8 @@
       disabledBefore = [];
     }
     busy = value;
+    if (window.DiaryLibrary) window.DiaryLibrary.setBusy(value);
+    renderSavedPhotos();
     if (!value) updateMode();
     document
       .querySelector(".writer-page")
@@ -1953,7 +2157,8 @@
     .addEventListener("click", function () {
       showEditor(false);
     });
-  document.getElementById("save-draft").addEventListener("click", saveDraft);
+  document.getElementById("save-draft").addEventListener("click", function () { saveCloudDraft(false); });
+  document.getElementById("save-draft-copy").addEventListener("click", function () { saveCloudDraft(true); });
   document.querySelectorAll("[data-format]").forEach(function (button) {
     button.addEventListener("click", function () {
       var start = bodyInput.selectionStart;
@@ -1994,7 +2199,7 @@
   document.addEventListener("keydown", function (event) {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
-      if (!busy) saveDraft();
+      if (!busy) saveCloudDraft(false);
     }
   });
   window.addEventListener("beforeunload", function (event) {
@@ -2003,7 +2208,7 @@
       (!draftSaved && hasChanges()) ||
       coverInput.files.length ||
       galleryInput.files.length ||
-      (visibilityInput.value === "private" && hasChanges()) ||
+      ((privateWorkspace || visibilityInput.value === "private") && hasUnstoredChanges()) ||
       (window.DiaryPrivate && window.DiaryPrivate.hasPending(bodyInput.value)) ||
       document.getElementById("profile-photo").files.length ||
       JSON.stringify(readProfile()) !== profileBaseline
@@ -2026,7 +2231,7 @@
       var response = await fetch(siteBase + "/posts.json");
       if (!response.ok) return;
       postIndex = await response.json();
-      renderPostOptions(
+      if (!libraryLoaded) renderPostOptions(
         postIndex.map(function (post) {
           return { path: post.path, name: post.title };
         }),
@@ -2252,7 +2457,7 @@
   if (newDraftButton)
     newDraftButton.addEventListener("click", function () {
       if (
-        hasChanges() &&
+        hasUnstoredChanges() &&
         !window.confirm("작성 중인 임시글을 비우고 새 글을 시작할까요?")
       )
         return;
@@ -2284,6 +2489,24 @@
     });
   });
 
+  if (window.DiaryLibrary) window.DiaryLibrary.onAction(async function (action, item) {
+    if (busy || !ensureConnectionInfo()) return;
+    if (item.kind === "draft") { if (action === "delete-draft") await deleteCloudDraft(item); else await readCloudDraft(item); return; }
+    postListSelect.value = (item.kind === "private" ? "private:" : "") + item.path;
+    if (await loadSelectedPost()) {
+      if (action === "visibility") { visibilityInput.value = item.kind === "public" ? "private" : "public"; updateMode(); saveDraft(); await publishPost(); }
+      else document.querySelector(".writing-sheet").scrollIntoView({block:"start",behavior:"smooth"});
+    }
+  });
+  document.querySelectorAll("[data-library-view]").forEach(function (link) {
+    link.addEventListener("click", function () {
+      document.getElementById("manage").open = true;
+      if (window.DiaryLibrary) window.DiaryLibrary.select(link.dataset.libraryView);
+    });
+  });
+  document.getElementById("manage").addEventListener("toggle", function () {
+    if (this.open && !libraryLoaded && !busy && ensureConnectionInfo()) loadPostList(true);
+  });
   publishButton.addEventListener("click", publishPost);
 
   loadConfig();
@@ -2301,23 +2524,30 @@
         renderProfilePreview();
         if (window.location.hash === "#profile") document.getElementById("profile").open = true;
         preparePostIndex();
+        if (window.location.hash === "#manage") document.getElementById("manage").open = true;
       }
+      if (window.DiaryPublication) window.DiaryPublication.resume(info);
       document.getElementById("connection").open = false;
     } else {
       if (workspaceInitialized && hasChanges()) saveDraft();
       var authStatus = window.DiaryAuth && window.DiaryAuth.getState().status;
       if (authStatus !== "checking" && workspaceInitialized) {
-        if (visibilityInput.value === "private" || loadedVisibility === "private") {
+        writerEpoch++; libraryVersion++; libraryLoaded = false; libraryDrafts = []; publicTitleCache.clear();
+        if (privateWorkspace || visibilityInput.value === "private" || loadedVisibility === "private") {
           try { sessionStorage.removeItem(draftKey() + ":private"); } catch (_) {}
           titleInput.value = ""; bodyInput.value = ""; coverUrlInput.value = "";
           coverInput.value = ""; galleryInput.value = ""; currentPostPathInput.value = "";
           loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null;
           visibilityInput.value = "public"; previewRequest++;
+          savedGallery = []; cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; privateWorkspace = false;
+          renderSavedPhotos();
           previewTitle.textContent = ""; previewBody.innerHTML = ""; previewCover.innerHTML = ""; previewGallery.innerHTML = "";
           document.getElementById("cover-card-preview").removeAttribute("src");
         }
         if (window.DiaryPrivate) window.DiaryPrivate.clear();
         renderPostOptions([]); statusElement.textContent = "";
+        if (window.DiaryLibrary) window.DiaryLibrary.clear();
+        if (window.DiaryPublication) window.DiaryPublication.stop(true);
         workspaceInitialized = false;
       }
       document.getElementById("connection").open = true;

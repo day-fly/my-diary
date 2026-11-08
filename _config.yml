@@ -4,6 +4,9 @@ url: "https://day-fly.github.io"
 baseurl: "/my-diary"
 lang: "ko-KR"
 timezone: "Asia/Seoul"
+repository: "day-fly/my-diary"
+plugins:
+  - jekyll-github-metadata
 writer:
   owner: "day-fly"
   repo: "my-diary"

@@ -12,6 +12,11 @@
         autocomplete="off"
     /></label>
   </div>
+  <div class="archive-years" role="group" aria-label="연도별 기록" hidden>
+    <button type="button" data-archive-year="" aria-pressed="true">전체 <span>{{ site.posts.size }}</span></button>
+    {% assign archive_years = site.posts | group_by_exp: 'post', "post.date | date: '%Y'" %}
+    {% for year in archive_years %}<button type="button" data-archive-year="{{ year.name }}" aria-pressed="false">{{ year.name }} <span>{{ year.items.size }}</span></button>{% endfor %}
+  </div>
   <div class="archive-tools">
     <span class="result-count" id="result-count" role="status">최신순</span>
   </div>
@@ -22,6 +27,7 @@
     {% include post-cover.html post=post %}
     <article
       class="post-card"
+      data-year="{{ post.date | date: '%Y' }}"
       data-search="{{ post.title | append: ' ' | append: post.content | strip_html | normalize_whitespace | escape }}"
     >
       <a href="{{ post.url | relative_url }}" class="post-card-link">
