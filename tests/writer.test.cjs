@@ -121,21 +121,20 @@ function setup({
     },
   };
 }
-test("draft restores Korean text, category, edit metadata; credentials stay out of drafts", async () => {
+test("draft restores Korean text without classification; credentials stay out of drafts", async () => {
   const a = setup();
   await flush();
   a.input("post-title", "오늘의 기록");
   a.input("post-body", "한글과 **마음**\n둘째 줄");
-  a.input("post-category", "시");
   a.input("gh-token", "test-only-token");
   const draft = JSON.parse(a.w.localStorage.getItem(a.key));
   assert.equal(draft.title, "오늘의 기록");
-  assert.equal(draft.category, "시");
+  assert.equal(draft.category, undefined);
   assert.ok(!JSON.stringify(draft).includes("test-only-token"));
   const b = setup({ draft });
   await flush();
   assert.equal(b.d.getElementById("post-body").value, draft.body);
-  assert.equal(b.d.getElementById("post-category").value, "시");
+  assert.equal(b.d.getElementById("post-category"), null);
   a.w.close();
   b.w.close();
 });
@@ -176,7 +175,7 @@ test("editing preserves category and multiline front matter and uses the loaded 
   a.d.getElementById("post-list").value = postPath;
   a.d.getElementById("load-selected-post").click();
   await flush();
-  assert.equal(a.d.getElementById("post-category").value, "시");
+  assert.equal(a.d.getElementById("post-category"), null);
   assert.equal(a.d.getElementById("delete-post").disabled, false);
   a.input("post-body", "수정한 문장");
   a.d.getElementById("publish-post").click();
@@ -263,7 +262,7 @@ test("profile rejects unsafe links and conflicting remote updates", async () => 
   assert.match(a.d.getElementById("profile-status").textContent, /다른 곳/);
   a.w.close();
 });
-test("search combines content matching and categories, with a resettable empty state", () => {
+test("search matches title and body without classification and resets empty results", () => {
   const dom = new JSDOM(readFileSync("_site/index.html", "utf8"), {
       runScripts: "outside-only",
     }),
@@ -275,7 +274,9 @@ test("search combines content matching and categories, with a resettable empty s
   search.value = "교무실";
   search.dispatchEvent(new w.Event("input"));
   assert.equal(d.querySelectorAll(".post-card:not([hidden])").length, 1);
-  d.querySelector('[data-filter="시"]').click();
+  assert.equal(d.querySelector("[data-filter]"), null);
+  search.value = "없는 문장 xyz123";
+  search.dispatchEvent(new w.Event("input"));
   assert.equal(d.querySelectorAll(".post-card:not([hidden])").length, 0);
   assert.equal(d.getElementById("search-empty").hidden, false);
   d.getElementById("reset-search").click();
@@ -330,6 +331,7 @@ test("a successful new post stays editable and does not persist credentials in l
   await flush();
   assert.equal(a.writes.length, 1);
   assert.equal(a.writes[0].payload.sha, undefined);
+  assert.doesNotMatch(Buffer.from(a.writes[0].payload.content, "base64").toString(), /^category:/m);
   assert.equal(a.d.getElementById("publish-post").textContent, "수정 발행");
   assert.equal(
     JSON.parse(a.w.localStorage.getItem("myDiaryWriterConfigV3")).token,

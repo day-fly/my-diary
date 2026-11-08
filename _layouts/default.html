@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}?v={{ site.time | date: '%s' }}" />
   </head>
   <body{% if page.permalink == '/write/' %} class="is-writer"{% endif %}>
+    {% include season-effects.html %}
     <a class="skip-link" href="#main">본문으로 건너뛰기</a>
     <header class="site-header">
       <a class="site-title" href="{{ '/' | relative_url }}">{% include brand-mark.html %}{{ site.title }}</a>
@@ -24,7 +25,7 @@
       </nav>
     </header>
     <main id="main" class="page-wrap" tabindex="-1">{{ content }}</main>
-    <footer class="site-footer"><span>© {{ 'now' | date: '%Y' }} {{ site.title }}</span><span>시와 에세이, 그리고 지나가는 날들.</span></footer>
+    <footer class="site-footer"><span>© {{ 'now' | date: '%Y' }} {{ site.title }}</span><span>시와 에세이, 그리고 지나가는 날들.</span><button class="effects-toggle" type="button" data-season-effects-toggle aria-pressed="true" hidden>계절 효과 끄기</button></footer>
     {% include background-music.html %}
   </body>
 </html>
