@@ -61,6 +61,7 @@
   if (document.readyState === "loading")
     document.addEventListener("DOMContentLoaded", refresh, { once: true });
   window.addEventListener("pageshow", refresh);
+  window.addEventListener("diary:page-load", refresh);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") refresh();
   });

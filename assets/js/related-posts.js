@@ -63,58 +63,68 @@
   }
   if (typeof module === "object" && module.exports) module.exports = { selectRelated };
   if (typeof document === "undefined") return;
-  const section = document.querySelector(".related-posts");
-  if (!section) return;
-  async function load() {
+  let cleanup = () => {};
+  function init() {
+    cleanup();
+    const section = document.querySelector(".related-posts");
+    if (!section) return;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await fetch(section.dataset.readingIndex, { signal: controller.signal });
-      if (!response.ok) return;
-      const posts = await response.json();
-      if (!Array.isArray(posts)) return;
-      const list = section.querySelector(".related-list");
-      selectRelated(posts, section.dataset.currentPost).forEach(post => {
-        const url = new URL(post.url, location.href);
-        if (url.origin !== location.origin) return;
-        const link = document.createElement("a");
-        link.className = "related-card";
-        link.href = url.href;
-        if (post.image) {
-          const source = new URL(post.image, location.href);
-          if (["https:", "http:"].includes(source.protocol)) {
-            const image = document.createElement("img");
-            image.src = source.href;
-            image.alt = "";
-            image.loading = "lazy";
-            image.width = 96;
-            image.height = 72;
-            link.append(image);
+    let observer, timer;
+    cleanup = () => { controller.abort(); observer?.disconnect(); clearTimeout(timer); };
+    async function load() {
+      timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch(section.dataset.readingIndex, { signal: controller.signal });
+        if (!response.ok) return;
+        const posts = await response.json();
+        if (!Array.isArray(posts) || controller.signal.aborted || !section.isConnected) return;
+        const list = section.querySelector(".related-list");
+        list.replaceChildren();
+        selectRelated(posts, section.dataset.currentPost).forEach(post => {
+          const url = new URL(post.url, location.href);
+          if (url.origin !== location.origin) return;
+          const link = document.createElement("a");
+          link.className = "related-card";
+          link.href = url.href;
+          if (post.image) {
+            const source = new URL(post.image, location.href);
+            if (["https:", "http:"].includes(source.protocol)) {
+              const image = document.createElement("img");
+              image.src = source.href;
+              image.alt = "";
+              image.loading = "lazy";
+              image.width = 96;
+              image.height = 72;
+              link.append(image);
+            }
           }
+          const text = document.createElement("span");
+          const title = document.createElement("strong");
+          title.textContent = post.title;
+          const date = document.createElement("span");
+          date.className = "related-date";
+          date.textContent = post.date;
+          text.append(title, date);
+          link.append(text);
+          list.append(link);
+        });
+        section.hidden = !list.children.length;
+      } catch (_) {
+        // The server-rendered previous/next links remain available offline.
+      } finally { clearTimeout(timer); }
+    }
+    const anchor = document.querySelector(".post-pager");
+    if ("IntersectionObserver" in window && anchor) {
+      observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          observer.disconnect();
+          load();
         }
-        const text = document.createElement("span");
-        const title = document.createElement("strong");
-        title.textContent = post.title;
-        const date = document.createElement("span");
-        date.className = "related-date";
-        date.textContent = post.date;
-        text.append(title, date);
-        link.append(text);
-        list.append(link);
-      });
-      section.hidden = !list.children.length;
-    } catch (_) {
-      // The server-rendered previous/next links remain available offline.
-    } finally { clearTimeout(timer); }
+      }, { rootMargin: "600px" });
+      observer.observe(anchor);
+    } else load();
   }
-  const anchor = document.querySelector(".post-pager");
-  if ("IntersectionObserver" in window && anchor) {
-    const observer = new IntersectionObserver(entries => {
-      if (entries.some(entry => entry.isIntersecting)) {
-        observer.disconnect();
-        load();
-      }
-    }, { rootMargin: "600px" });
-    observer.observe(anchor);
-  } else load();
+  window.addEventListener("diary:page-unload", () => cleanup());
+  window.addEventListener("diary:page-load", init);
+  init();
 })();
