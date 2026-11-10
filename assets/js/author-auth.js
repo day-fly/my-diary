@@ -137,6 +137,7 @@
     else if (event.key === configKey) check();
   });
   window.addEventListener("pageshow", event => { if (event.persisted) check(); });
+  window.addEventListener("diary:page-load", () => render(state));
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && Date.now() - lastCheck > 300000) check();
   });
