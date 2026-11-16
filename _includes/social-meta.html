@@ -22,4 +22,4 @@
 <meta name="twitter:description" content="{{ share_description | escape }}" />
 <meta name="twitter:image" content="{{ share_image | absolute_url }}" />
 {% if page.layout == 'post' %}<meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}" /><meta name="author" content="{{ site.data.profile.name | escape }}" />{% endif %}
-{% if page.url == '/write/' %}<meta name="robots" content="noindex,nofollow" />{% endif %}
+{% if page.url == '/write/' or page.noindex %}<meta name="robots" content="noindex,nofollow" />{% endif %}

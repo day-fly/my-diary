@@ -64,7 +64,7 @@ function setup({ localDB, localSession, localValues, locks, visual=false, export
   w.eval(readFileSync('assets/js/photo-editor.js','utf8'));
   if(locks)Object.defineProperty(w.navigator,'locks',{value:locks});
   if(localValues)for(const [k,v] of Object.entries(localValues))w.localStorage.setItem(k,v);
-  if(localDB){w.indexedDB=localDB;if(localSession)for(const [k,v] of Object.entries(localSession))w.sessionStorage.setItem(k,v);w.eval(readFileSync('assets/js/local-drafts.js','utf8'));}
+  if(localDB){w.indexedDB=localDB;Object.defineProperty(w.crypto,'subtle',{value:require('node:crypto').webcrypto.subtle});if(localSession)for(const [k,v] of Object.entries(localSession))w.sessionStorage.setItem(k,v);w.eval(readFileSync('assets/js/local-drafts.js','utf8'));}
   if(exporter)w.eval(readFileSync('assets/js/export-entry.js','utf8'));
   if(visual)w.eval(readFileSync('assets/js/rich-editor-entry.js','utf8'));
   w.eval(readFileSync('assets/js/writer.js','utf8'));

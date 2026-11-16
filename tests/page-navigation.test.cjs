@@ -5,11 +5,12 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 const base = 'https://example.test/my-diary/';
 const html = path => readFileSync('_site/' + path.replace(/^\/my-diary\//, '') + (path.endsWith('/') ? 'index.html' : ''), 'utf8');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
-function setup({ path = '/my-diary/', fetchPage, authorized = false } = {}) {
+function setup({ path = '/my-diary/', fetchPage, authorized = false, shortTimeout = false } = {}) {
   const errors = [], requests = [], console = new VirtualConsole();
   console.on('jsdomError', error => errors.push(error));
   const dom = new JSDOM(html(path), { url: new URL(path, base).href, runScripts: 'outside-only', virtualConsole: console });
   const w = dom.window, d = w.document, audio = d.querySelector('audio');
+  if (shortTimeout) { const schedule = w.setTimeout.bind(w); w.setTimeout = (fn, ms, ...args) => schedule(fn, ms === 10000 ? 5 : ms, ...args); }
   let plays = 0, pauses = 0, paused = true, loads = 0;
   Object.defineProperties(audio, { paused: { get: () => paused }, duration: { value: 300 } });
   audio.play = async () => { plays++; paused = false; };
@@ -33,7 +34,7 @@ function setup({ path = '/my-diary/', fetchPage, authorized = false } = {}) {
   return { w, d, audio, errors, requests, counts: () => ({ plays, pauses, loads }), click: selector => d.querySelector(selector).click(), close: () => w.close() };
 }
 function response(path, overrides = {}) {
-  return { ok: true, headers: { get: () => 'text/html; charset=utf-8' }, url: new URL(path, base).href, text: async () => html(path), ...overrides };
+  return { ok: true, status: 200, headers: { get: () => 'text/html; charset=utf-8' }, url: new URL(path, base).href, text: async () => html(path), ...overrides };
 }
 async function back(a, forward = false) {
   a.w.history[forward ? 'forward' : 'back']();
@@ -148,18 +149,23 @@ test('external links, new tabs, downloads, writer and anchors keep native naviga
   a.click('.site-title'); assert.equal(intercepted, true); assert.equal(a.requests.length, 0);
   assert.deepEqual(a.counts(), { plays: 1, pauses: 0, loads: 0 }); a.close();
 });
-test('failed, changed or invalid pages fall back without replacing the readable page', async () => {
-  for (const mode of ['network', '404', 'version', 'writer', 'wrong-content']) {
+test('failed, missing, changed or invalid pages keep the readable page and offer appropriate recovery', async () => {
+  for (const mode of ['network', '404', '503', 'version', 'writer', 'wrong-content']) {
     const a = setup({ fetchPage: async url => {
       if (mode === 'network') throw Error('offline');
-      if (mode === '404') return response(url.pathname, { ok: false });
+      if (mode === '404' || mode === '503') return response(url.pathname, { ok: false, status: Number(mode) });
       if (mode === 'wrong-content') return response(url.pathname, { headers: { get: () => 'application/json' } });
       return response(url.pathname, { text: async () => html(url.pathname).replace(mode === 'version' ? /data-navigation-version="[^"]+"/ : /<body /, mode === 'version' ? 'data-navigation-version="old"' : '<body class="is-writer" ') });
     } });
     a.click('.post-card-link'); await flush();
     assert.ok(a.d.querySelector('[data-archive]'), mode);
     assert.equal(a.d.querySelector('#main').hasAttribute('aria-busy'), false);
-    assert.ok(a.errors.some(error => error.message.includes('navigation')), mode);
+    assert.equal(a.errors.length, 0, mode);
+    assert.equal(a.w.location.href, base, mode);
+    assert.equal(a.d.querySelector('.navigation-notice').hidden, false, mode);
+    assert.equal(a.d.querySelector('[data-navigation-retry]').hidden, ['404','version'].includes(mode), mode);
+    assert.equal(a.d.querySelector('[data-navigation-reload]').hidden, mode !== 'version', mode);
+    assert.deepEqual(a.counts(), { plays: 1, pauses: 0, loads: 0 });
     a.close();
   }
 });
@@ -170,4 +176,48 @@ test('paused music stays paused across reading navigation and the next-track con
   a.click('.music-next'); assert.equal(a.counts().plays, 1);
   a.click('.music-toggle'); await flush(); assert.equal(a.counts().plays, 2); assert.equal(a.audio.paused, false);
   assert.equal(a.errors.length, 0); a.close();
+});
+test('a failed link can be retried or dismissed without losing scroll, text or playback', async () => {
+  let offline = true;
+  const a = setup({ fetchPage: async url => { if (offline) throw Error('offline'); return response(url.pathname); } });
+  await flush(); a.w.scrollTo(0, 540); const main = a.d.querySelector('#main');
+  a.click('.post-card-link'); await flush();
+  assert.equal(a.d.querySelector('#main'), main); assert.equal(a.w.scrollY, 540);
+  offline = false; a.click('[data-navigation-retry]'); await flush();
+  assert.ok(a.d.querySelector('.post-content')); assert.equal(a.d.querySelector('.navigation-notice').hidden, true);
+  offline = true; a.click('.back-link'); await flush();
+  a.click('[data-navigation-dismiss]'); assert.equal(a.d.querySelector('.navigation-notice').hidden, true); assert.equal(a.d.activeElement.id, 'main');
+  offline = false; a.click('.post-header .text-link'); await flush();
+  assert.ok(a.d.querySelector('.about-page')); assert.deepEqual(a.counts(), { plays: 1, pauses: 0, loads: 0 }); assert.equal(a.errors.length, 0); a.close();
+});
+test('a timed out request shows retry without restarting music or leaving the current address', async () => {
+  const a = setup({ shortTimeout: true, fetchPage: (_, options) => new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new Error('timeout')))) });
+  a.click('.post-card-link'); await new Promise(resolve => setTimeout(resolve, 15)); await flush();
+  assert.equal(a.w.location.href, base); assert.equal(a.d.querySelector('.navigation-notice').hidden, false); assert.equal(a.d.querySelector('#main').hasAttribute('aria-busy'), false);
+  assert.deepEqual(a.counts(), { plays: 1, pauses: 0, loads: 0 }); assert.equal(a.errors.length, 0); a.close();
+});
+test('failed Back to an evicted page restores its history entry and retries the original destination', async () => {
+  let offline = false;
+  const a = setup({ fetchPage: async url => { if (offline) throw Error('offline'); return response(url.pathname); } });
+  const urls=[];
+  a.click('.post-card-link'); await flush(); urls.push(a.w.location.href);
+  for(let i=0;i<8;i++){a.click('.post-pager-link');await flush();urls.push(a.w.location.href);}
+  const last=a.w.location.href, length=a.w.history.length; a.w.scrollTo(0, 380); offline=true;
+  a.w.history.go(-9); await new Promise(resolve=>setTimeout(resolve,60)); await flush();
+  assert.equal(a.w.location.href,last);assert.equal(a.w.history.length,length);assert.equal(a.w.scrollY,380);assert.equal(a.d.querySelector('.navigation-notice').hidden,false);
+  offline=false;a.click('[data-navigation-retry]');await new Promise(resolve=>setTimeout(resolve,40));await flush();
+  assert.equal(a.w.location.href,base);assert.equal(a.w.history.length,length);assert.ok(a.d.querySelector('[data-archive]'));
+  await back(a,true);assert.equal(a.w.location.href,urls[0]);assert.equal(a.d.querySelector('.navigation-notice').hidden,true);
+  assert.deepEqual(a.counts(),{plays:1,pauses:0,loads:0});assert.equal(a.errors.length,0);a.close();
+});
+test('late failures from an abandoned request cannot reopen the retry notice', async () => {
+  let rejectOld;
+  const a=setup({fetchPage:url=>url.pathname==='/my-diary/about/'?Promise.resolve(response(url.pathname)):new Promise((resolve,reject)=>rejectOld=reject)});
+  a.click('.post-card-link');a.click('.profile-identity');await flush();rejectOld(new Error('old failure'));await flush();
+  assert.ok(a.d.querySelector('.about-page'));assert.equal(a.d.querySelector('.navigation-notice').hidden,true);assert.equal(a.errors.length,0);a.close();
+});
+test('the standalone missing-page view has the diary layout, a base-aware return link and noindex',()=>{
+  const dom=new JSDOM(readFileSync('_site/404.html','utf8'),{url:'https://example.test/my-diary/2026/01/01/missing/'}),d=dom.window.document;
+  assert.match(d.querySelector('h1').textContent,/글이 없어요/);assert.equal(d.querySelector('.not-found-page a').getAttribute('href'),'/my-diary/#archive-title');
+  assert.equal(d.querySelector('meta[name="robots"]').content,'noindex,nofollow');assert.ok(d.querySelector('.site-header'));assert.ok(d.querySelector('.site-footer'));dom.window.close();
 });
