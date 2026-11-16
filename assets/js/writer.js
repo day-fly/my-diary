@@ -12,6 +12,7 @@
   var previewRequest = 0;
   var savedGallery = [];
   var cloudDraftId = null, cloudDraftSha = null, cloudSnapshot = "";
+  var pendingPost = null, pendingCloud = null, retrySave = null;
   var privateWorkspace = false;
   var libraryDrafts = [], libraryVersion = 0, libraryLoaded = false, writerEpoch = 0;
   var publicTitleCache = new Map();
@@ -852,6 +853,38 @@
     saveDraft();
   });
 
+  // The deadline includes reading the response body. A late response can never
+  // resume an expired operation, even when a browser transport ignores abort.
+  async function requestJson(url, options) {
+    var controller = new AbortController(), timer;
+    try {
+      return await Promise.race([
+        (async function () {
+          var response = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+          if (controller.signal.aborted) throw new Error("Expired request");
+          var payload = (response.headers.get("content-type") || "").includes("application/json") ? await response.json() : await response.text();
+          if (controller.signal.aborted) throw new Error("Expired request");
+          if (!response.ok && response.status !== 404) {
+            if (response.status === 401) window.DiaryAuth?.logout();
+            throw Object.assign(new Error(payload?.message || "HTTP " + response.status), { httpStatus: response.status, retryable: response.status >= 500 || response.status === 408 || response.status === 429 });
+          }
+          return { response: response, payload: payload };
+        })(),
+        new Promise(function (_, reject) { timer = setTimeout(function () {
+          controller.abort();
+          reject(Object.assign(new Error("연결 응답이 늦어 작업을 멈췄어요. 작성 내용은 남겨 두었으니 연결을 확인한 뒤 다시 시도해 주세요."), { retryable: true }));
+        }, 20000); }),
+      ]);
+    } catch (error) {
+      if (error.name === "TypeError" || error.name === "AbortError") error = Object.assign(new Error("인터넷 연결을 확인하지 못했어요. 연결이 돌아오면 다시 시도해 주세요."), { retryable: true });
+      if (!error.httpStatus) error.retryable = true;
+      throw error;
+    } finally { clearTimeout(timer); }
+  }
+  function offerSaveRetry(error, action) {
+    retrySave = error.retryable ? action : null;
+    document.getElementById("writer-retry").hidden = !retrySave;
+  }
   async function githubFetch(url, token, options) {
     var finalOptions = options || {};
     if (window.DiaryPrivate && url.startsWith(API_BASE + "/repos/" + encodeURIComponent(ownerInput.value) + "/" + encodeURIComponent(document.querySelector(".writer-page").dataset.privateRepo) + "/")) {
@@ -872,42 +905,25 @@
       headers["Content-Type"] = "application/json";
     }
 
-    var response = await fetch(url, {
+    var result = await requestJson(url, {
       method: finalOptions.method || "GET",
       headers: headers,
       body: body,
       cache: "no-store", credentials: "omit",
     });
 
-    var payload = null;
-    var contentType = response.headers.get("content-type") || "";
-    if (contentType.indexOf("application/json") >= 0) {
-      payload = await response.json();
-    } else {
-      payload = await response.text();
-    }
-
-    if (!response.ok) {
-      if (response.status === 401 && window.DiaryAuth) window.DiaryAuth.logout();
-      var detail =
-        payload && payload.message
-          ? payload.message
-          : "HTTP " + response.status;
-      throw new Error(detail);
-    }
-    return payload;
+    if (!result.response.ok) throw new Error(result.payload?.message || "HTTP " + result.response.status);
+    return result.payload;
   }
 
   async function proxyExchangeToken(proxyUrl, payload) {
-    var response = await fetch(proxyUrl, {
+    var result = await requestJson(proxyUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    var contentType = response.headers.get("content-type") || "";
-    var data =
-      contentType.indexOf("application/json") >= 0 ? await response.json() : {};
-    if (!response.ok)
+    var data = result.payload;
+    if (!result.response.ok)
       throw new Error(data.message || data.error || "OAuth token 교환 실패");
     if (!data.access_token)
       throw new Error("OAuth access token이 응답에 없습니다.");
@@ -926,7 +942,7 @@
       "?ref=" +
       encodeURIComponent(branch);
 
-    var response = await fetch(url, {
+    var result = await requestJson(url, {
       cache: "no-store", credentials: "omit",
       headers: {
         Accept: "application/vnd.github+json",
@@ -934,12 +950,20 @@
       },
     });
 
-    if (response.status === 404) return null;
-    if (response.status === 401 && window.DiaryAuth) window.DiaryAuth.logout();
+    if (result.response.status === 404) return null;
+    return result.payload;
+  }
 
-    var payload = await response.json();
-    if (!response.ok) throw new Error(payload.message || "파일 확인 실패");
-    return payload;
+  async function sameContent(meta, base64) {
+    if (!meta) return false;
+    if (meta.content) return meta.content.replace(/\s/g, "") === base64.replace(/\s/g, "");
+    // GitHub omits inline content for large photos. Compare its Git blob ID.
+    if (!crypto.subtle || !/^[a-f0-9]{40}$/.test(meta.sha || "")) return false;
+    var raw = atob(base64), header = new TextEncoder().encode("blob " + raw.length + "\0");
+    var bytes = new Uint8Array(header.length + raw.length); bytes.set(header);
+    for (var i = 0; i < raw.length; i++) bytes[header.length + i] = raw.charCodeAt(i);
+    var hash = await crypto.subtle.digest("SHA-1", bytes);
+    return Array.from(new Uint8Array(hash), function (byte) { return byte.toString(16).padStart(2, "0"); }).join("") === meta.sha;
   }
 
   async function putContent(params) {
@@ -950,6 +974,7 @@
       params.path,
       params.token,
     );
+    if (await sameContent(existing, params.contentBase64)) return { content: { sha: existing.sha } };
     if (
       Object.prototype.hasOwnProperty.call(params, "expectedSha") &&
       (existing ? existing.sha : null) !== params.expectedSha
@@ -965,7 +990,7 @@
     };
     if (existing && existing.sha) payload.sha = existing.sha;
 
-    return githubFetch(
+    try { return await githubFetch(
       API_BASE +
         "/repos/" +
         encodeURIComponent(params.owner) +
@@ -975,7 +1000,15 @@
         encodePath(params.path),
       params.token,
       { method: "PUT", body: payload },
-    );
+    ); } catch (error) {
+      if (!error.retryable) throw error;
+      // A timed-out PUT may have committed. Verify bytes before retrying it.
+      try {
+        var saved = await getContentMeta(params.owner, params.repo, params.branch, params.path, params.token);
+        if (await sameContent(saved, params.contentBase64)) return { content: { sha: saved.sha } };
+      } catch (_) {}
+      throw error;
+    }
   }
 
   async function deleteContent(params) {
@@ -991,7 +1024,7 @@
     if (Object.prototype.hasOwnProperty.call(params, "expectedSha") && existing.sha !== params.expectedSha)
       throw new Error("다른 곳에서 내용이 변경되었습니다. 최신 글을 다시 불러와 주세요.");
 
-    return githubFetch(
+    try { return await githubFetch(
       API_BASE +
         "/repos/" +
         encodeURIComponent(params.owner) +
@@ -1008,7 +1041,16 @@
           branch: params.branch,
         },
       },
-    );
+    ); } catch (error) {
+      if (!error.retryable) throw error;
+      try {
+        if (!await getContentMeta(params.owner, params.repo, params.branch, params.path, params.token)) {
+          var head = await githubFetch(API_BASE + "/repos/" + encodeURIComponent(params.owner) + "/" + encodeURIComponent(params.repo) + "/commits/" + encodeURIComponent(params.branch), params.token);
+          return { commit: { sha: head.sha } };
+        }
+      } catch (_) {}
+      throw error;
+    }
   }
 
   async function listPosts(owner, repo, branch, token) {
@@ -1179,6 +1221,7 @@
   }
 
   function resetDraftMode() {
+    pendingPost = null; pendingCloud = null;
     loadedSha = null;
     loadedFrontMatter = "";
     loadedVisibility = "public"; moveTarget = null;
@@ -1513,6 +1556,7 @@
         throw new Error("포스트 내용을 찾지 못했습니다.");
 
       if (!ensureConnectionInfo()) return;
+      pendingPost = null; pendingCloud = null;
       savedGallery = []; cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; privateWorkspace = visibility === "private";
       loadedVisibility = visibility;
       visibilityInput.value = visibility;
@@ -1643,14 +1687,19 @@
       setStatus("제목이나 본문을 적거나 사진을 추가한 뒤 보관해 주세요.", "status-info"); return;
     }
     var epoch = writerEpoch;
-    var id = asCopy || !cloudDraftId ? newCloudDraftId() : cloudDraftId;
-    var expectedSha = asCopy ? null : cloudDraftSha;
+    if (pendingCloud && asCopy && !pendingCloud.asCopy) pendingCloud = null;
+    if (pendingCloud) asCopy = pendingCloud.asCopy;
+    var id = pendingCloud ? pendingCloud.id : asCopy || !cloudDraftId ? newCloudDraftId() : cloudDraftId;
+    var expectedSha = pendingCloud ? pendingCloud.expectedSha : asCopy ? null : cloudDraftSha;
+    var attempt = pendingCloud ? pendingCloud.attempt : newCloudDraftId();
     saveDraft(); setBusy(true);
     setStatus("사진과 글을 비공개 보관함에 저장하고 있어요…", "status-info");
     try {
       var target = await window.DiaryPrivate.check(info);
       var current = await getContentMeta(target.owner, target.repo, target.branch, cloudDraftPath(id), target.token);
+      if (pendingCloud && current && JSON.parse(base64ToUtf8(current.content)).save_attempt === attempt) expectedSha = current.sha;
       if ((current ? current.sha : null) !== expectedSha) throw new Error("다른 기기에서 이 임시글이 변경됐어요. 새 임시글로 보관하거나 최신 내용을 다시 불러와 주세요.");
+      pendingCloud = { id: id, attempt: attempt, asCopy: asCopy, expectedSha: expectedSha }; saveDraft();
       var data = draftData();
       var upload = function (file) { return uploadImage(target.owner, target.repo, target.branch, target.token, file, "draft-" + id); };
       (coverFile() ? [coverFile()] : []).concat(Array.from(galleryInput.files)).forEach(validateImage);
@@ -1661,23 +1710,26 @@
       for (var ref of savedGallery) data.galleryRefs.push(await window.DiaryPrivate.prepare(ref, target, upload, true));
       for (var file of Array.from(galleryInput.files)) data.galleryRefs.push(await upload(file));
       data.version = 1; data.hasFiles = false; data.privateWorkspace = true;
+      data.save_attempt = attempt;
+      delete data.pendingCloud;
       delete data.localTab; delete data.cloudDraftId; delete data.cloudDraftSha; delete data.cloudSnapshot;
-      if (asCopy) { data.path = ""; data.sha = null; data.frontMatter = ""; data.loadedVisibility = "public"; data.moveTarget = null; data.publishedSnapshot = ""; }
+      if (asCopy) { data.path = ""; data.sha = null; data.frontMatter = ""; data.loadedVisibility = "public"; data.moveTarget = null; data.publishedSnapshot = ""; data.pendingPost = null; }
       var text = JSON.stringify(data, null, 2) + "\n";
       if (new TextEncoder().encode(text).length > 900000) throw new Error("임시글이 너무 길어요. 여러 글로 나눠 보관해 주세요.");
       window.DiaryPrivate.assert(info); if (epoch !== writerEpoch) return;
       var saved = await putContent({ owner:target.owner, repo:target.repo, branch:target.branch, token:target.token, path:cloudDraftPath(id), expectedSha:expectedSha, contentBase64:utf8ToBase64(text), message:"Save private diary draft" });
       if (!ensureConnectionInfo() || epoch !== writerEpoch) return;
+      pendingCloud = null;
       cloudDraftId = id; cloudDraftSha = saved.content.sha; privateWorkspace = true;
       bodyInput.value = data.body; coverUrlInput.value = data.cover; savedGallery = data.galleryRefs;
       coverInput.value = ""; restoredCoverFile = null; galleryInput.value = "";
-      if (asCopy) { currentPostPathInput.value = ""; loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null; publishedSnapshot = ""; }
+      if (asCopy) { currentPostPathInput.value = ""; loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null; publishedSnapshot = ""; pendingPost = null; }
       cloudSnapshot = snapshot(); saveDraft(); updatePreview();
       await loadPostList(true);
       if (epoch !== writerEpoch || !ensureConnectionInfo()) return;
       draftStatus.textContent = "보관함에 저장됨 · 다른 기기에서 이어 쓸 수 있어요";
       setStatus("보관함에 저장했어요. 사진과 글을 다른 기기에서도 이어 쓸 수 있습니다.", "status-success");
-    } catch (error) { setStatus("보관함 저장 실패: " + error.message + " 현재 작성 내용은 그대로 남아 있어요.", "status-error"); }
+    } catch (error) { setStatus("보관함 저장을 완료하지 못했어요: " + error.message + " 현재 작성 내용은 그대로 남아 있어요.", "status-error"); offerSaveRetry(error, function () { return saveCloudDraft(asCopy); }); }
     finally { setBusy(false); }
   }
   async function readCloudDraft(item) {
@@ -1692,6 +1744,7 @@
       if (!meta || !meta.content) throw new Error("임시글이 삭제되었거나 이동했어요. 목록을 새로고침해 주세요.");
       var data = validateCloudDraft(JSON.parse(base64ToUtf8(meta.content)));
       if (!ensureConnectionInfo() || epoch !== writerEpoch) return;
+      pendingPost = null; pendingCloud = null;
       titleInput.value = data.title; bodyInput.value = data.body; dateInput.value = data.date || formatDatetimeLocal(new Date());
       visibilityInput.value = data.visibility === "private" ? "private" : "public";
       loadedVisibility = data.loadedVisibility === "private" ? "private" : "public";
@@ -1810,6 +1863,20 @@
       }
       if (visibility === "private") info = await window.DiaryPrivate.check(info);
       if (loadedVisibility === "private" && currentPostPathInput.value) sourceInfo = await window.DiaryPrivate.check(sourceInfo);
+      var reservedPath = "";
+      if (pendingPost) {
+        // Keep a new post's chosen address across response loss and reloads.
+        // A later retry checks its revision before creating or updating anything.
+        if (pendingPost.visibility !== visibility) throw new Error("저장 여부를 먼저 확인해야 해요. 이전 공개 범위로 돌아가 다시 시도해 주세요.");
+        var pendingResult = await getContentMeta(info.owner, info.repo, info.branch, pendingPost.path, info.token);
+        if (pendingResult && parseMarkdown(base64ToUtf8(pendingResult.content)).data.diary_revision === pendingPost.revision) {
+          if (moving) moveTarget = { path: pendingPost.path, visibility: visibility, sha: pendingResult.sha };
+          else { currentPostPathInput.value = pendingPost.path; loadedSha = pendingResult.sha; loadedVisibility = visibility; sourceInfo = info; }
+        } else if ((pendingResult ? pendingResult.sha : null) !== pendingPost.expectedSha) {
+          throw new Error("저장 결과를 확인하는 중 다른 곳에서 수정한 글을 발견했어요. 글 관리에서 최신 글을 불러와 주세요.");
+        }
+        reservedPath = pendingPost.path;
+      }
       var sourceAlreadyRemoved = false;
       if (currentPostPathInput.value) {
         var original = await getContentMeta(sourceInfo.owner, sourceInfo.repo, sourceInfo.branch, currentPostPathInput.value, sourceInfo.token);
@@ -1823,7 +1890,7 @@
 
       var currentPath = currentPostPathInput.value.trim();
       var slug = slugify(title);
-      var postPath = currentPath;
+      var postPath = currentPath || reservedPath;
       if (!postPath) {
         postPath = await buildUniquePostPath(
           info.owner,
@@ -1897,8 +1964,10 @@
       }, visibility === "private");
       if (visibility === "public") markdown = normalizeBodyAssetUrls(markdown);
       if (!ensureConnectionInfo()) throw new Error("로그인이 해제되어 저장을 중단했어요.");
+      var expectedPostSha = moving ? (moveTarget && moveTarget.visibility === visibility && moveTarget.path === postPath ? moveTarget.sha : null) : currentPath ? loadedSha : null;
+      pendingPost = { path: postPath, revision: revision, visibility: visibility, expectedSha: expectedPostSha }; saveDraft();
       var savedPost = await putContent({
-        expectedSha: moving ? (moveTarget && moveTarget.visibility === visibility && moveTarget.path === postPath ? moveTarget.sha : null) : currentPath ? loadedSha : null,
+        expectedSha: expectedPostSha,
         owner: info.owner,
         repo: info.repo,
         branch: info.branch,
@@ -1929,6 +1998,7 @@
         else window.DiaryPublication.privateSaved();
       }
       moveTarget = null;
+      pendingPost = null;
       loadedVisibility = visibility;
       savedGallery = [];
       currentPostPathInput.value = postPath;
@@ -1961,7 +2031,8 @@
         true,
       );
     } catch (error) {
-      setStatus("발행 실패: " + error.message, "status-error");
+      setStatus("발행을 완료하지 못했어요: " + error.message, "status-error");
+      offerSaveRetry(error, publishPost);
     } finally {
       setBusy(false);
       updateMode();
@@ -1987,6 +2058,7 @@
   }
   function draftData() {
     return {
+      pendingPost: pendingPost, pendingCloud: pendingCloud,
       localTab: window.DiaryLocalDrafts?.tabId || null,
       cloudDraftId: cloudDraftId, cloudDraftSha: cloudDraftSha, cloudSnapshot: cloudSnapshot, privateWorkspace: privateWorkspace,
       galleryRefs: savedGallery.slice(),
@@ -2102,6 +2174,51 @@
       if (epoch === writerEpoch && ensureConnectionInfo()) { restoreDraft(); draftStatus.textContent = "글 임시저장만 사용 중 · 사진은 보관함 저장을 눌러 주세요"; }
     }
   }
+  async function refreshLocalDraftList() {
+    var list = document.getElementById("local-drafts-list"), message = document.getElementById("local-drafts-status");
+    if (!ensureConnectionInfo()) return;
+    var epoch = writerEpoch;
+    message.textContent = "기기에 남은 임시글을 확인하고 있어요…";
+    try {
+      if (!window.DiaryLocalDrafts) throw new Error("이 브라우저에서는 기기 임시글을 사용할 수 없어요.");
+      var records = await window.DiaryLocalDrafts.list();
+      if (epoch !== writerEpoch || !ensureConnectionInfo()) return;
+      list.replaceChildren();
+      records.forEach(function (record) {
+        var row = document.createElement("article"), text = document.createElement("div"), title = document.createElement("h3"), date = document.createElement("p"), button = document.createElement("button");
+        row.className = "library-row"; text.className = "library-row-text"; date.className = "library-row-meta";
+        title.textContent = record.title;
+        date.textContent = new Date(record.savedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + (record.sensitive ? " · 비공개 임시저장" : " · 기기 임시저장");
+        button.type = "button"; button.className = "btn-light"; button.textContent = record.current ? "현재 창의 글" : "복원"; button.disabled = record.current;
+        button.setAttribute("aria-label", record.title + " · " + button.textContent);
+        button.addEventListener("click", function () { restoreSelectedLocalDraft(record.id); });
+        text.append(date, title); row.append(text, button); list.append(row);
+      });
+      message.textContent = records.length ? records.length + "개의 임시글 · 저장 시간은 한국 시간입니다." : "이 기기에 남은 임시글이 없어요.";
+    } catch (error) { if (epoch === writerEpoch) message.textContent = error.message; }
+  }
+  async function restoreSelectedLocalDraft(id) {
+    if (busy || !ensureConnectionInfo()) return;
+    var epoch = writerEpoch;
+    setBusy(true);
+    try {
+      var record = await window.DiaryLocalDrafts.read(id);
+      // Flush and copy the current draft before replacing any text or photo URL.
+      saveDraft(); clearTimeout(localSaveTimer);
+      await persistLocalDraft(localSaveVersion, epoch);
+      if (!localSnapshotSaved) throw new Error("지금 쓰던 글을 보존하지 못해 복원을 멈췄어요. 먼저 보관함에 저장해 주세요.");
+      await window.DiaryLocalDrafts.preserve();
+      if (epoch !== writerEpoch || !ensureConnectionInfo()) return;
+      window.DiaryPrivate.clear(); window.DiaryPrivate.restoreFiles(record.files);
+      coverInput.value = ""; galleryInput.value = ""; restoredCoverFile = record.cover;
+      restoreDraft(record.data); updatePreview(); updateMode(); showEditor(true);
+      saveDraft(); clearTimeout(localSaveTimer); await persistLocalDraft(localSaveVersion, epoch);
+      await refreshLocalDraftList();
+      setStatus("선택한 임시글과 사진을 복원했어요. 지금 쓰던 글도 기기 임시글 목록에 남겨 두었습니다.", "status-success");
+      document.querySelector(".writing-sheet").scrollIntoView({ block: "start", behavior: "smooth" });
+    } catch (error) { setStatus("임시글 복원 실패: " + error.message, "status-error"); }
+    finally { setBusy(false); }
+  }
   function restoreDraft(savedData) {
     publishedSnapshot = snapshot();
     try {
@@ -2113,6 +2230,8 @@
       )
         return;
       cloudDraftId = /^[a-f0-9]{24}$/.test(draft.cloudDraftId || "") ? draft.cloudDraftId : null;
+      pendingPost = draft.pendingPost && /^_posts\/[A-Za-z0-9_.-]+\.md$/.test(draft.pendingPost.path || "") && /^[a-f0-9]{24}$/.test(draft.pendingPost.revision || "") ? draft.pendingPost : null;
+      pendingCloud = draft.pendingCloud && /^[a-f0-9]{24}$/.test(draft.pendingCloud.id || "") && /^[a-f0-9]{24}$/.test(draft.pendingCloud.attempt || "") ? draft.pendingCloud : null;
       cloudDraftSha = cloudDraftId ? draft.cloudDraftSha : null; cloudSnapshot = draft.cloudSnapshot || "";
       privateWorkspace = !!draft.privateWorkspace || !!cloudDraftId;
       savedGallery = Array.isArray(draft.galleryRefs) ? draft.galleryRefs.filter(function (url) { return typeof url === "string" && (/^diary-private:\/assets\//.test(url) || (!!savedData && /^diary-pending:/.test(url) && !!window.DiaryPrivate.url(url))); }) : [];
@@ -2151,10 +2270,11 @@
   function updateConnectionState() {
     var authState = window.DiaryAuth ? window.DiaryAuth.getState() : { status: "guest" };
     document.getElementById("connection-state").textContent =
-      authState.status === "authenticated" ? "@" + authState.login + " 로그인됨" : authState.status === "checking" ? "계정 확인 중…" : "로그인이 필요해요";
+      authState.status === "authenticated" ? "@" + authState.login + " 로그인됨" : authState.status === "checking" ? "계정 확인 중…" : authState.temporary ? "연결 확인이 필요해요" : "로그인이 필요해요";
     document.getElementById("oauth-ready-action").hidden = !(oauthClientIdInput.value.trim() && oauthProxyUrlInput.value.trim());
   }
   function setBusy(value) {
+    if (value) { retrySave = null; document.getElementById("writer-retry").hidden = true; }
     if (value && !busy) {
       disabledBefore = Array.from(
         document.querySelectorAll(
@@ -2277,6 +2397,8 @@
   window.addEventListener("hashchange", function () {
     if (window.location.hash === "#profile")
       document.getElementById("profile").open = true;
+    if (window.location.hash === "#local-drafts" && ensureConnectionInfo())
+      document.getElementById("local-drafts").open = true;
   });
 
   async function preparePostIndex() {
@@ -2502,6 +2624,10 @@
     apply:function(markdown){var parsed=parseMarkdown(markdown);titleInput.value=parsed.data.title||"";bodyInput.value=parsed.body.replace(/^\n+/,"");loadedFrontMatter=parsed.frontMatter;coverUrlInput.value=parsed.data.cover||"";autoCoverInput.checked=parsed.data.cover_auto!=="false";coverPosition(parsed.data.cover_x??50,parsed.data.cover_y??50);if(parsed.data.date){var date=new Date(parsed.data.date);if(!Number.isNaN(date.getTime()))dateInput.value=formatDatetimeLocal(date);}savedGallery=[];galleryInput.value="";coverInput.value="";cloudDraftId=null;cloudDraftSha=null;cloudSnapshot="";updatePreview();saveDraft();showEditor(true);document.querySelector(".writing-sheet").scrollIntoView({block:"start",behavior:"smooth"});}
   });
   if (saveConfigButton) saveConfigButton.addEventListener("click", connectWriter);
+  document.getElementById("writer-retry").addEventListener("click", function () { if (!busy && retrySave) retrySave(); });
+  document.getElementById("open-local-drafts").addEventListener("click", function () { document.getElementById("local-drafts").open = true; });
+  document.getElementById("refresh-local-drafts").addEventListener("click", function () { if (!busy) refreshLocalDraftList(); });
+  document.getElementById("local-drafts").addEventListener("toggle", function () { if (this.open && !busy) refreshLocalDraftList(); });
   tokenInput.addEventListener("keydown", function (event) {
     if (event.key === "Enter") { event.preventDefault(); connectWriter(); }
   });
@@ -2587,6 +2713,8 @@
   updateConnectionState();
   async function handleAuthorState() {
     var info = window.DiaryAuth && window.DiaryAuth.getConnection();
+    statusElement.hidden = !info;
+    document.getElementById("writer-retry").hidden = !info || !retrySave;
     if (info) {
       tokenInput.value = info.token;
       if (!workspaceInitialized) {
@@ -2601,16 +2729,23 @@
         if (window.location.hash === "#profile") document.getElementById("profile").open = true;
         preparePostIndex();
         if (window.location.hash === "#manage") document.getElementById("manage").open = true;
+        if (window.location.hash === "#local-drafts") document.getElementById("local-drafts").open = true;
+      } else if (!localSnapshotSaved) {
+        saveDraft();
       }
       if (window.DiaryPublication) window.DiaryPublication.resume(info);
       document.getElementById("connection").open = false;
     } else {
       if (workspaceInitialized && hasChanges()) saveDraft();
-      var authStatus = window.DiaryAuth && window.DiaryAuth.getState().status;
-      if (authStatus !== "checking" && workspaceInitialized) {
+      var authState = window.DiaryAuth && window.DiaryAuth.getState();
+      if (authState?.status !== "checking" && !authState?.temporary && workspaceInitialized) {
         clearTimeout(localSaveTimer); localSaveVersion++; localSnapshotSaved = false;
         window.DiaryLocalDrafts?.clearSensitive(); window.DiaryExport?.clear(); window.DiaryRichEditor?.clear();
         window.DiaryRecovery?.clear();
+        document.getElementById("local-drafts-list").replaceChildren();
+        document.getElementById("local-drafts-status").textContent = "";
+        document.getElementById("local-drafts").open = false;
+        retrySave = null; document.getElementById("writer-retry").hidden = true;
         writerEpoch++; libraryVersion++; libraryLoaded = false; libraryDrafts = []; publicTitleCache.clear();
         if (privateWorkspace || visibilityInput.value === "private" || loadedVisibility === "private") {
           try { sessionStorage.removeItem(draftKey() + ":private"); } catch (_) {}
@@ -2619,6 +2754,7 @@
           loadedSha = null; loadedFrontMatter = ""; loadedVisibility = "public"; moveTarget = null;
           visibilityInput.value = "public"; previewRequest++;
           savedGallery = []; cloudDraftId = null; cloudDraftSha = null; cloudSnapshot = ""; privateWorkspace = false;
+          pendingPost = null; pendingCloud = null;
           renderSavedPhotos();
           previewTitle.textContent = ""; previewBody.innerHTML = ""; previewCover.innerHTML = ""; previewGallery.innerHTML = "";
           document.getElementById("cover-card-preview").removeAttribute("src");

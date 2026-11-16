@@ -24,7 +24,7 @@ test('moving a public post first saves private content, then removes the exact p
 });
 test('a private save failure preserves the public source without deleting it',async()=>{
   const a=setup({failPrivateWrite:true});await flush();await a.load();a.input('post-visibility','private');await a.save();
-  assert.equal(a.publicFiles.has(path),true);assert.equal(a.writes.some(v=>v.method==='DELETE'),false);assert.match(a.el('writer-status').textContent,/실패/);a.close();
+  assert.equal(a.publicFiles.has(path),true);assert.equal(a.writes.some(v=>v.method==='DELETE'),false);assert.match(a.el('writer-status').textContent,/완료하지 못/);a.close();
 });
 test('an interrupted move truthfully reports still-public status and can safely resume',async()=>{
   const a=setup({failDelete:true});await flush();await a.load();a.input('post-visibility','private');await a.save();

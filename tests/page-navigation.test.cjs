@@ -5,10 +5,10 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 const base = 'https://example.test/my-diary/';
 const html = path => readFileSync('_site/' + path.replace(/^\/my-diary\//, '') + (path.endsWith('/') ? 'index.html' : ''), 'utf8');
 const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
-function setup({ path = '/my-diary/', fetchPage, authorized = false, shortTimeout = false } = {}) {
+function setup({ path = '/my-diary/', markup, fetchPage, authorized = false, shortTimeout = false } = {}) {
   const errors = [], requests = [], console = new VirtualConsole();
   console.on('jsdomError', error => errors.push(error));
-  const dom = new JSDOM(html(path), { url: new URL(path, base).href, runScripts: 'outside-only', virtualConsole: console });
+  const dom = new JSDOM(markup || html(path), { url: new URL(path, base).href, runScripts: 'outside-only', virtualConsole: console });
   const w = dom.window, d = w.document, audio = d.querySelector('audio');
   if (shortTimeout) { const schedule = w.setTimeout.bind(w); w.setTimeout = (fn, ms, ...args) => schedule(fn, ms === 10000 ? 5 : ms, ...args); }
   let plays = 0, pauses = 0, paused = true, loads = 0;
@@ -68,6 +68,13 @@ test('home, articles and about preserve the connected audio, playback, metadata 
   assert.equal(a.d.querySelectorAll('audio').length, 1);
   assert.deepEqual(a.counts(), { plays: 1, pauses: 0, loads: 0 });
   assert.equal(a.errors.length, 0); a.close();
+});
+test('leaving a nested 404 removes robots exclusion and Back restores only the error-page metadata',async()=>{
+ const a=setup({path:'/my-diary/2026/11/16/missing/',markup:readFileSync('_site/404.html','utf8')});await flush();
+ assert.equal(a.d.querySelector('meta[name="robots"]').content,'noindex,nofollow');
+ a.click('.not-found-page a');await flush();assert.ok(a.d.querySelector('[data-archive]'));assert.equal(a.d.querySelector('meta[name="robots"]'),null);assert.equal(a.d.querySelector('link[rel="canonical"]').href,base.replace('example.test','day-fly.github.io'));
+ a.click('.site-nav a[href="/my-diary/about/"]');await flush();assert.equal(a.d.querySelector('meta[name="robots"]'),null);
+ await back(a);await back(a);assert.ok(a.d.querySelector('.not-found-page'));assert.equal(a.d.querySelector('meta[name="robots"]').content,'noindex,nofollow');assert.equal(a.d.querySelectorAll('meta[name="robots"]').length,1);assert.deepEqual(a.counts(),{plays:1,pauses:0,loads:0});a.close();
 });
 test('Back and Forward restore search, year and scroll without starting the music again', async () => {
   const a = setup(); await flush();

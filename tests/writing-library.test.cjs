@@ -44,7 +44,7 @@ test('publishing a restored photo-only draft includes its gallery, converts path
 test('cloud storage failure or missing permission never sends an unpublished draft to the public repository',async()=>{
   for(const opts of [{vaultState:'missing'},{failPrivateWrite:true}]){
     const a=setup(opts);await flush();a.input('post-title','아직 쓰는 중');a.input('post-body','지킬 문장');await clickSave(a);
-    assert.equal(a.writes.some(w=>!w.vault),false);assert.equal(a.el('post-body').value,'지킬 문장');assert.match(a.el('writer-status').textContent,/실패/);a.close();
+    assert.equal(a.writes.some(w=>!w.vault),false);assert.equal(a.el('post-body').value,'지킬 문장');assert.match(a.el('writer-status').textContent,/완료하지 못/);a.close();
   }
 });
 test('publishing fails safely if the original published post changed after its editing draft was saved',async()=>{

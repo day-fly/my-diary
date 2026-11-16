@@ -9,9 +9,11 @@ permalink: /write/
   <p class="writer-login-help" data-guest-only>하루살이의 글을 쓰고 다듬는 공간입니다.<br />작성자 계정으로 로그인하면 글쓰기와 수정 메뉴가 열립니다.</p>
   <noscript><p class="writer-help">로그인하려면 브라우저의 자바스크립트를 켜 주세요.</p></noscript>
   <p id="writer-status" class="writer-status" role="status" aria-live="polite"></p>
+  <button id="writer-retry" type="button" class="btn-light" hidden>저장 여부 확인 후 다시 시도</button>
   <details class="writer-panel writer-connection-panel" id="connection" open>
     <summary><span>작성자 계정</span><span class="summary-note" id="connection-state">로그인이 필요해요</span></summary>
     <p id="author-status" class="writer-status" role="status" data-author-status>작성자 계정으로 로그인해 주세요.</p>
+    <button type="button" class="btn-light" data-auth-retry hidden>연결 다시 확인</button>
     <div class="writer-fields"><label>GitHub 로그인 키<input id="gh-token" type="password" placeholder="기존 발행에 사용하던 GitHub 토큰" autocomplete="off" spellcheck="false" /><span class="writer-tip">@{{ site.writer.owner }} 계정의 이 블로그 발행용 토큰을 사용하세요.</span></label><label class="writer-check"><input id="remember-token" type="checkbox" /> 이 기기에 로그인 정보 기억하기 (개인 기기에서만)</label></div>
     <div class="writer-inline"><button id="save-config" type="button" class="btn-strong">로그인</button><button id="oauth-logout" type="button" class="btn-light" data-author-only hidden>로그아웃</button></div>
     <input id="gh-owner" type="hidden" /><input id="gh-repo" type="hidden" /><input id="gh-branch" type="hidden" />
@@ -23,7 +25,13 @@ permalink: /write/
     <p id="oauth-status" class="writer-status" aria-live="polite"></p>
   </details>
   <div class="writer-workspace" data-author-only hidden>
-  <nav class="writer-shortcuts" aria-label="작성자 메뉴"><a class="text-link" href="#manage" data-library-view="all">글 관리 ↗</a><a class="text-link" href="#manage" data-library-view="draft">임시글 보관함 ↗</a></nav>
+  <nav class="writer-shortcuts" aria-label="작성자 메뉴"><a class="text-link" href="#local-drafts" id="open-local-drafts">이 기기의 임시글 ↗</a><a class="text-link" href="#manage" data-library-view="all">글 관리 ↗</a><a class="text-link" href="#manage" data-library-view="draft">임시글 보관함 ↗</a></nav>
+  <details class="writer-panel" id="local-drafts">
+    <summary><span>이 기기의 임시글</span><span class="summary-note">닫은 창의 글도 찾아보세요</span></summary>
+    <p class="writer-help">이 브라우저에 자동 저장한 글입니다. 복원하면 지금 쓰던 글도 목록에 남겨 둡니다. 다른 기기로 옮기려면 복원한 뒤 보관함에 저장해 주세요.</p>
+    <button id="refresh-local-drafts" type="button" class="btn-light">목록 새로고침</button>
+    <p id="local-drafts-status" class="writer-help" role="status"></p><div id="local-drafts-list" class="library-list"></div>
+  </details>
   <div class="writer-actionbar"><div><span id="draft-status" role="status">이 브라우저에 자동 임시저장</span><span id="word-count" class="muted">0자</span></div><div class="writer-main-actions"><button id="new-draft" type="button" class="btn-light">새 글</button><button id="save-draft" type="button" class="btn-light">보관함 저장</button><button id="publish-post" type="button" class="btn-strong">발행하기 <span aria-hidden="true">↗</span></button></div></div>
   <section class="publication-status" id="publication-status" aria-label="사이트 반영 상태" hidden>
     <ol class="publication-steps"><li data-publication-step="saved">저장됨</li><li data-publication-step="pending">사이트 반영 중</li><li data-publication-step="complete">반영 완료</li></ol>
