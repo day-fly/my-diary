@@ -2041,3 +2041,24 @@ img.ProseMirror-separator { display: inline !important; border: none !important;
 
 .ProseMirror.is-empty::before { content: attr(data-placeholder); position: absolute; top: 16px; left: 0; color: var(--ink-soft); pointer-events: none; }
 .format-toolbar button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
+/* Reading stays in place when the next page cannot be reached. */
+.navigation-notice { position: fixed; left: 24px; bottom: 24px; z-index: 40; width: min(480px, calc(100vw - 48px)); padding: 18px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); box-shadow: 0 8px 32px rgb(0 0 0 / 10%); font: 13px/1.8 var(--sans); }
+.navigation-notice[hidden], .navigation-notice [hidden] { display: none; }
+.navigation-notice p { margin: 0 0 12px; }
+.navigation-notice > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.navigation-notice a, .navigation-notice button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.navigation-notice button.text-link { border: 0; padding: 8px 4px; background: none; font: inherit; cursor: pointer; }
+.not-found-page { max-width: 620px; margin: 60px auto 100px; text-align: center; }
+.not-found-mark { display: flex; justify-content: center; margin: 36px 0 24px; color: var(--accent); }
+.not-found-mark .brand-mark { width: 64px; height: 64px; margin: 0; }
+.not-found-page h1 { font-size: clamp(26px, 5vw, 38px); font-weight: 600; line-height: 1.5; }
+.not-found-page > p:not(.eyebrow) { color: var(--ink-soft); font-size: 15px; line-height: 2; margin: 20px 0 32px; }
+.not-found-page .btn-strong { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; text-decoration: none; }
+@media (max-width: 900px) {
+  .navigation-notice { left: 16px; bottom: calc(88px + env(safe-area-inset-bottom)); width: calc(100vw - 32px); max-width: 480px; padding: 16px; }
+}
+@media (max-width: 760px) {
+  .not-found-page { margin: 40px auto 64px; }
+  .not-found-page > p:not(.eyebrow) { font-size: 14px; }
+}
