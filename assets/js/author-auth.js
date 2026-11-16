@@ -12,6 +12,8 @@
   let state = { status: "guest", login: "", message: "작성자 계정으로 로그인해 주세요." };
   let version = 0;
   let lastCheck = 0;
+  let retryAttempt = null;
+  let verifiedBefore = false;
 
   function read(storage, key) {
     try {
@@ -35,6 +37,8 @@
     document.querySelectorAll("[data-author-only]").forEach(el => { el.hidden = !active; });
     document.querySelectorAll("[data-guest-only]").forEach(el => { el.hidden = active; });
     document.querySelectorAll("[data-author-status]").forEach(el => { el.textContent = state.message; });
+    document.querySelectorAll("[data-auth-retry]").forEach(el => { el.hidden = !state.temporary; });
+    if (state.temporary && verifiedBefore) document.querySelectorAll("[data-author-logout]").forEach(el => { el.hidden = false; });
     window.dispatchEvent(new CustomEvent("diary:auth", { detail: { ...state } }));
   }
   function clearCredentials() {
@@ -78,6 +82,7 @@
   }
   async function login(token, options = {}) {
     token = typeof token === "string" ? token.trim() : "";
+    retryAttempt = { token, options };
     const attempt = ++version;
     connection = null;
     lastCheck = Date.now();
@@ -92,16 +97,21 @@
         throw error;
       }
       const repository = await request("/repos/" + encodeURIComponent(owner) + "/" + encodeURIComponent(repo), token);
-      if (repository.permissions?.push !== true) throw new Error("이 블로그를 수정할 수 있는 GitHub 계정 권한이 필요해요.");
+      if (repository.permissions?.push !== true) throw Object.assign(new Error("이 블로그를 수정할 수 있는 GitHub 계정 권한이 필요해요."), { invalid: true });
       if (attempt !== version) return false;
       connection = { owner, repo, branch, token };
+      verifiedBefore = true;
+      retryAttempt = null;
       const saved = options.persist === false || persist(token, !!options.remember);
       render({ status: "authenticated", login: user.login, message: "@" + user.login + " 로그인됨" + (saved ? "" : " · 이 창에서만 유지됩니다") });
       return true;
     } catch (error) {
       if (attempt !== version) return false;
-      if (error.invalid) clearCredentials();
-      render({ status: "error", login: "", message: error.name === "AbortError" || error instanceof TypeError ? "계정을 확인할 수 없어요. 인터넷 연결을 확인하고 다시 로그인해 주세요." : error.message });
+      if (error.invalid) { clearCredentials(); retryAttempt = null; verifiedBefore = false; }
+      const temporary = !!token && !error.invalid;
+      render({ status: "error", temporary, login: "", message: temporary
+        ? "연결을 확인하지 못해 작성 화면을 잠시 잠갔어요. 임시글은 보존됩니다. 연결이 돌아오면 다시 확인해 주세요."
+        : error.message });
       return false;
     }
   }
@@ -118,6 +128,8 @@
   function logout(broadcast = true) {
     ++version;
     connection = null;
+    retryAttempt = null;
+    verifiedBefore = false;
     clearCredentials();
     try { sessionStorage.removeItem("myDiaryWriterOAuthPendingV1"); } catch (_) {}
     if (broadcast) {
@@ -127,11 +139,13 @@
   }
   window.DiaryAuth = {
     login, logout, check,
+    retry: () => retryAttempt ? login(retryAttempt.token, retryAttempt.options) : check(),
     getState: () => ({ ...state }),
     getConnection: () => connection && { ...connection },
     isAuthorized: info => !!connection && state.status === "authenticated" && matches(info) && info.token === connection.token,
   };
   document.querySelectorAll("[data-author-logout]").forEach(button => button.addEventListener("click", () => logout()));
+  document.querySelectorAll("[data-auth-retry]").forEach(button => button.addEventListener("click", () => window.DiaryAuth.retry()));
   window.addEventListener("storage", event => {
     if (event.key === logoutKey) logout(false);
     else if (event.key === configKey) check();

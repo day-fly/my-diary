@@ -225,7 +225,7 @@ test("failed publication retains the draft and re-enables controls", async () =>
   a.input("post-body", "잃지 않을 내용");
   a.d.getElementById("publish-post").click();
   await flush();
-  assert.match(a.d.getElementById("writer-status").textContent, /발행 실패/);
+  assert.match(a.d.getElementById("writer-status").textContent, /발행을 완료하지 못/);
   assert.equal(
     JSON.parse(a.w.localStorage.getItem(a.key)).body,
     "잃지 않을 내용",

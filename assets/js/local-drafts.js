@@ -143,7 +143,7 @@
       });
     }
   }
-  function read() {
+  function read(selectedId) {
     const version = epoch;
     return enqueue(async () => {
       await claimSlot();
@@ -152,10 +152,34 @@
       try { await migrate(db, version); } catch (_) { assert(version); }
       const restored = await transaction(db, stores, 'readonly', async tx => {
         const records = await result(tx.objectStore('drafts').getAll());
-        const record = records.find(r => r.id === id) || records.sort((a, b) => b.savedAt - a.savedAt).find(r => r.data.title || r.data.body || (r.format === 2 ? r.attachments.length || r.cover : r.refs.length || r.coverKey));
+        const record = selectedId ? records.find(r => r.id === selectedId) : records.find(r => r.id === id) || records.sort((a, b) => b.savedAt - a.savedAt).find(hasContent);
+        if (selectedId && !record) throw new Error('이 임시글을 찾을 수 없어요. 목록을 새로고침해 주세요.');
         return readFiles(tx, record);
       });
       assert(version); return restored;
+    });
+  }
+  function hasContent(record) { return record.data.title || record.data.body || (record.format === 2 ? record.attachments.length || record.cover : record.refs.length || record.coverKey); }
+  function list() {
+    const version = epoch;
+    return enqueue(async () => {
+      const db = await open(); assert(version);
+      const records = await transaction(db, ['drafts'], 'readonly', tx => result(tx.objectStore('drafts').getAll()));
+      assert(version);
+      return records.filter(hasContent).sort((a, b) => b.savedAt - a.savedAt).map(record => ({ id: record.id, title: record.data.title || '제목 없는 임시글', savedAt: record.savedAt, sensitive: !!record.sensitive, current: record.id === id }));
+    });
+  }
+  // Restoring another draft must leave an independent copy of the current one.
+  // Photo references are copied atomically; their bytes remain shared.
+  function preserve() {
+    const version = epoch;
+    return enqueue(async () => {
+      const db = await open(); assert(version);
+      await transaction(db, ['drafts'], 'readwrite', async tx => {
+        const drafts = tx.objectStore('drafts'), current = await result(drafts.get(id));
+        assert(version);
+        if (current && hasContent(current)) drafts.put({ ...current, id: crypto.randomUUID() });
+      });
     });
   }
   function write(data, files, cover, sensitive) {
@@ -183,5 +207,5 @@
       });
     }).catch(() => {});
   }
-  window.DiaryLocalDrafts = { read, write, clearSensitive, get tabId() { return id; } };
+  window.DiaryLocalDrafts = { read, write, list, preserve, clearSensitive, get tabId() { return id; } };
 })();

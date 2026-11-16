@@ -3,7 +3,7 @@
   const base = document.body.dataset.navigationBase;
   const version = document.body.dataset.navigationVersion;
   if (!base || !version || document.body.classList.contains("is-writer") || !window.fetch) return;
-  const metadata = 'link[rel="canonical"], meta[name="description"], meta[name="author"], meta[property^="og:"], meta[property^="article:"], meta[name^="twitter:"]';
+  const metadata = 'link[rel="canonical"], meta[name="description"], meta[name="author"], meta[name="robots"], meta[property^="og:"], meta[property^="article:"], meta[name^="twitter:"]';
   const pages = new Map(), positions = new Map();
   let renderedPath = location.pathname, renderedUrl = location.href, entryId, entryIndex = 0, serial = 0, pending, timeout, recovery, rollback;
   function readable(url) {
